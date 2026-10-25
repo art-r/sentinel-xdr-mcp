@@ -1,0 +1,12 @@
+.pytest_cache/
+.vscode/
+.safety-project.ini
+.DS_Store
+# Per-tenant reviewed policy: names the tenant, subscription, workspace and app
+# registrations. Only the example template is tracked. Allowlist, not blocklist:
+# per-tenant files accumulate with arbitrary names (NEWGN-, OLDGN-, ...) and a
+# blocklist misses every one that was not anticipated.
+backup-configs/
+config/*.yaml
+config/*.yml
+!config/mcp-server-config.example.yaml
