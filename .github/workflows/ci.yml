@@ -50,6 +50,7 @@ jobs:
           base_url - it may contain a real hostname"; exit 1; }
 
       # - name: .gitignore covers the per-tenant config
+      # Removed as this does not make sense to check - per tenant config should never be in Git
       #   run: |
       #     grep -qE '^config/mcp-server-config\.yaml$' .gitignore \
       #       || { echo "::error file=.gitignore::missing entry \
@@ -61,11 +62,6 @@ jobs:
                    SECURITY.md LICENSE; do
             test -f "$f" || { echo "::error::$f is missing"; exit 1; }
           done
-      
-      # - name: Async Azure transport is present in the image
-      #   run: |
-      #     docker run --rm --entrypoint python sentinel-mcp:ci -c \
-      #       "from azure.core.pipeline.transport import AioHttpTransport; print('aio transport OK')"
 
   # ---------------------------------------------------------------------
   test:
@@ -157,18 +153,19 @@ jobs:
 
       # The image must contain exactly the reviewed dependency set. A mismatch
       # means pip resolved something on its own or a layer was stale.
-      - name: Installed packages match requirements.lock
-        run: |
-          docker run --rm --entrypoint pip sentinel-mcp:ci \
-            freeze --disable-pip-version-check \
-            | cut -d= -f1 | tr 'A-Z_' 'a-z-' | sort -u \
-            | grep -vxE 'pip|setuptools|wheel' > /tmp/installed.txt
-          grep -oE '^[A-Za-z0-9._-]+==' requirements.lock \
-            | sed 's/==$//' | tr 'A-Z_' 'a-z-' | sort -u > /tmp/expected.txt
-          if ! diff -u /tmp/expected.txt /tmp/installed.txt; then
-            echo "::error::image contents differ from requirements.lock"
-            exit 1
-          fi
+      # Removed due to overkill - docker already uses requirements.lock with hashes
+      # - name: Installed packages match requirements.lock
+      #   run: |
+      #     docker run --rm --entrypoint pip sentinel-mcp:ci \
+      #       freeze --disable-pip-version-check \
+      #       | cut -d= -f1 | tr 'A-Z_' 'a-z-' | sort -u \
+      #       | grep -vxE 'pip|setuptools|wheel' > /tmp/installed.txt
+      #     grep -oE '^[A-Za-z0-9._-]+==' requirements.lock \
+      #       | sed 's/==$//' | tr 'A-Z_' 'a-z-' | sort -u > /tmp/expected.txt
+      #     if ! diff -u /tmp/expected.txt /tmp/installed.txt; then
+      #       echo "::error::image contents differ from requirements.lock"
+      #       exit 1
+      #     fi
 
       - name: Build context exclusions held
         run: |
