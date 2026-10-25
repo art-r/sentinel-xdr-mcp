@@ -1,0 +1,29 @@
+.git/
+.github/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.so
+.vscode
+.safety-project.ini
+requirements.txt
+
+# Tests and review material do not belong in the runtime image.
+tests/
+*.md
+
+# Never send local credentials or private key material to the Docker daemon.
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.cer
