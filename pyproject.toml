@@ -66,3 +66,20 @@ pythonpath = ["."]
 [build-system]
 requires = ["poetry-core>=2.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# Fundamental correctness checks plus useful bug-risk checks.
+select = [
+    "E4",  # Import and syntax-related errors
+    "E7",  # Statement errors
+    "E9",  # Runtime-related errors
+    "F",   # Pyflakes: undefined names, unused imports, etc.
+    "B",   # Flake8-bugbear: common bug patterns
+]
+
+[tool.ruff.format]
+# Keep formatting consistent without enforcing import sorting.
+quote-style = "double"

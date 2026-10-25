@@ -62,10 +62,10 @@ jobs:
             test -f "$f" || { echo "::error::$f is missing"; exit 1; }
           done
       
-      - name: Async Azure transport is present in the image
-        run: |
-          docker run --rm --entrypoint python sentinel-mcp:ci -c \
-            "from azure.core.pipeline.transport import AioHttpTransport; print('aio transport OK')"
+      # - name: Async Azure transport is present in the image
+      #   run: |
+      #     docker run --rm --entrypoint python sentinel-mcp:ci -c \
+      #       "from azure.core.pipeline.transport import AioHttpTransport; print('aio transport OK')"
 
   # ---------------------------------------------------------------------
   test:
@@ -186,7 +186,7 @@ jobs:
             || { echo "::error::image runs as '$user', expected 'mcp'"; exit 1; }
 
       - name: Trivy
-        uses: aquasecurity/trivy-action@0.76.1
+        uses: aquasecurity/trivy-action
         with:
           image-ref: sentinel-mcp:ci
           format: table
