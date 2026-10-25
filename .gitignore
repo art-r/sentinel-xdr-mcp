@@ -2,6 +2,7 @@
 .vscode/
 .safety-project.ini
 .DS_Store
+*.pyc
 # Per-tenant reviewed policy: names the tenant, subscription, workspace and app
 # registrations. Only the example template is tracked. Allowlist, not blocklist:
 # per-tenant files accumulate with arbitrary names (NEWGN-, OLDGN-, ...) and a

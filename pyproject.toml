@@ -1,0 +1,68 @@
+# Poetry project definition. `poetry.lock` is the source of truth for what gets
+# installed; `requirements.lock` is generated from it (poetry export --only
+# main) and is what the image installs with hash checking.
+#
+# Poetry project definition. Constraints mirror requirements.txt exactly.
+# No lock file is shipped yet: before production, commit a reviewed hash-pinned
+# lock and install from it in CI and Docker. The current Dockerfile deliberately
+# installs requirements.txt only for the first test deployment.
+#
+#   poetry install --with dev
+#   poetry run pytest -q
+#
+# package-mode = false: this is an application, not a library. Without it
+# Poetry tries to build/install `src` as a distribution and fails.
+[tool.poetry]
+package-mode = false
+
+[project]
+name = "sentinel-mcp-server"
+version = "1.0.0"
+description = "Governed MCP server exposing Microsoft Sentinel / Log Analytics to LLM callers"
+requires-python = ">=3.12,<3.14"
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.14"
+fastmcp = ">=3.0,<4.0"
+azure-identity = ">=1.17,<2.0"
+# 2.x splits the metrics clients out of the package - a deliberate decision,
+# not something to inherit from an open range.
+azure-monitor-query = ">=1.4,<2.0"
+# 1.0.0 is the newest non-prerelease; every 2.0.0bN is a beta. Poetry, like
+# pip, ignores pre-releases unless asked, so ">=2.0,<3.0" resolves to nothing.
+# 2.0.0b3 also renames SecurityInsights -> SecurityInsightsMgmtClient and moves
+# model fields under .properties, which this code does not expect.
+azure-mgmt-securityinsight = ">=1.0,<2.0"
+azure-monitor-opentelemetry = ">=1.6,<2.0"
+pydantic = ">=2.7,<3.0"
+pyyaml = ">=6.0,<7.0"
+structlog = ">=24.1,<26.0"
+uvicorn = ">=0.30,<1.0"
+# Pydantic's maintained continuation of httpx. httpx itself has had no stable
+# release since 0.28.1 (Dec 2024) and its issue tracker is closed to
+# contributors. Pinned exactly, not ranged: 2.x is young and moving.
+# httpx 0.28.1 remains in the image regardless - mcp hard-depends on it.
+httpx2 = "2.12.0"
+# Async transport for the .aio Azure clients in src/clients/law_client.py.
+# azure-core has no built-in async transport: AioHttpTransport imports aiohttp
+# lazily and raises ImportError without it. Neither azure-identity nor
+# azure-monitor-query requests the [aio] extra, so this is NOT transitive.
+#
+# Declared via the extra rather than a bare `aiohttp` pin so the version
+# constraint stays owned by azure-core.
+azure-core = { version = ">=1.31,<2.0", extras = ["aio"] }
+
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0,<9.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Equivalent to PYTHONPATH=. - so `pytest` works without the env var and,
+# more importantly, so it cannot silently pick up a DIFFERENT installed `src`.
+pythonpath = ["."]
+
+[build-system]
+requires = ["poetry-core>=2.0"]
+build-backend = "poetry.core.masonry.api"

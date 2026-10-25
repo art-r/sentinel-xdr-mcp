@@ -1,0 +1,262 @@
+# Reviewed security policy copied into the release image. Contains no secrets,
+# but controls security-relevant authorization and governance decisions. Every
+# key is validated at startup (extra="forbid"): a typo refuses to boot.
+server:
+  base_url: "https://mcp.example.invalid"
+  host: "0.0.0.0"
+  port: 8000
+  transport: "streamable-http"
+  # Must contain exactly the canonical hostname in base_url. Wildcards and
+  # alternate hosts are rejected; localhost is added automatically only in dev_mode.
+  host_header_allowlist:
+    - "mcp.example.invalid"
+  # Global, per-process workload protection across all callers and tools.
+  max_concurrent_requests: 4
+  # End-to-end tool-call deadline. It exceeds the longest LAW server timeout (180s).
+  max_request_timeout_seconds: 200
+  # true ONLY for local development - it is what permits localhost in the
+  # host-header allowlist. Must be false in every deployed environment.
+  dev_mode: false
+  # true exposes UNAUTHENTICATED /ready endpoint that triggers a print 1 kql query
+  # to validate if identities are correctly working etc.
+  expose_ready_probe: false
+
+identity:
+  tenant_id: "00000000-0000-0000-0000-000000000000"
+  # client id of the server app registration (for exchanging tokens)
+  mcp_app_client_id: "00000000-0000-0000-0000-000000000000"
+  # client id of the managed identity
+  mcp_mi_client_id: "00000000-0000-0000-0000-000000000000" 
+  # Client apps allowed to present DELEGATED tokens. Entra pre-authorisation
+  # only suppresses the consent prompt; this list is the actual restriction.
+  # this is used for SSO
+  allowed_client_app_ids:
+    - "00000000-0000-0000-0000-000000000000"
+  # Applications allowed to present APP-ONLY tokens (the investigation agent's
+  # managed identity). Leave the list empty until the agent exists.
+  allowed_agent_app_ids:
+    - "00000000-0000-0000-0000-000000000000" 
+  required_delegated_scope: "user_impersonation"
+  required_human_role: "Sentinel.Read"
+  required_agent_role: "MCP.Agent"
+  # Advertise api://<mcp_app_client_id> as the OAuth protected-resource
+  # identifier instead of this server's URL. Required while base_url is an
+  # ACA-generated hostname: Entra rejects a resource indicator that is not the
+  # prefix of the requested scope, and the generated hostname cannot be an
+  # Entra identifier URI. Set back to false when base_url becomes a custom
+  # domain registered as an identifier URI. See src/config.py.
+  advertise_app_id_uri_as_oauth_resource: true
+
+law:
+  workspace_id: "00000000-0000-0000-0000-000000000000"
+  subscription_id: "00000000-0000-0000-0000-000000000000"
+  resource_group: "replace-me-rg-name"
+  workspace_name: "replace-me=workspace-name"
+
+tables:
+  tier1:
+    - SecurityAlert
+    - SecurityIncident
+    - SigninLogs
+    - AADNonInteractiveUserSignInLogs
+    - AuditLogs
+  tier2:
+    - CommonSecurityLog
+    - Syslog
+    - DeviceEvents
+    - DeviceProcessEvents
+    - DeviceNetworkEvents
+    - DeviceFileEvents
+    - DeviceLogonEvents
+    - DeviceRegistryEvents
+    - EmailEvents
+    - EmailAttachmentInfo
+    - IdentityLogonEvents
+    - IdentityQueryEvents
+    - CloudAppEvents
+    - AADServicePrincipalSignInLogs
+    - AzureActivity
+  # Matched case-insensitively, and only where a table can actually appear, so
+  # a column named Operation or Usage is no longer a false positive.
+  blocked:
+    - Heartbeat
+    - Usage
+    - Operation
+    - AzureMetrics
+    - ConfigurationData
+
+defender:
+  # Tenant-wide, unscopeable read of the Defender XDR hunting corpus. Read
+  # trust-model.md, "Regime A extended", before setting this true.
+  enabled: false
+  graph_base_url: "https://graph.microsoft.com/v1.0"
+  # Must stay below server.max_request_timeout_seconds (200).
+  timeout_seconds: 170
+  max_result_rows: 5000
+  max_result_size_mb: 10
+  max_cell_chars: 4096
+  # The real quota is tenant-wide and shared with every other consumer of the
+  # hunting API. These bound THIS server's contribution. Verify Microsoft's
+  # current documented limits before raising them.
+  calls_per_minute: 10
+  daily_call_budget: 500
+  # Required IN ADDITION TO identity.required_human_role. Assign only to
+  # principals holding equivalent unrestricted access in Defender XDR.
+  required_role: "Defender.Hunt"
+  # Authoritative: advanced hunting has no table-enumeration endpoint, so there
+  # is no live discovery and no "workspace" policy. Adding a table here is an
+  # access decision.
+  allowed_tables:
+    # Vulnerability Management - the reason this integration exists. These
+    # tables are schema-only in Sentinel and hold no data there.
+    - DeviceTvmSoftwareInventory
+    - DeviceTvmSoftwareVulnerabilities
+    - DeviceTvmSoftwareVulnerabilitiesKB
+    - DeviceTvmSecureConfigurationAssessment
+    - DeviceTvmSecureConfigurationAssessmentKB
+    - DeviceTvmBrowserExtensions
+    # Device context needed to interpret the above
+    - DeviceInfo
+    - DeviceNetworkInfo
+    # Alert correlation
+    - AlertInfo
+    - AlertEvidence
+  # Blocked wins over allowed. Defence in depth against a careless edit above.
+  # Consider adding content- and HR-adjacent tables here if they are ever added
+  # to allowed_tables: EmailAttachmentInfo, UrlClickEvents, IdentityInfo.
+  blocked_tables: []
+  kql:
+    max_query_length: 4000
+    # Cross-scope functions, plus the advanced-hunting ENRICHMENT functions.
+    # The enrichment functions return data beyond the tables named in the
+    # query, so `extracted_tables` in the audit record would stop describing
+    # what was actually accessed. The trust model relies on that record as the
+    # detection control for a malicious insider, so they are banned regardless
+    # of the RBAC regime.
+    banned_functions:
+      - FileProfile
+      - SeenBy
+      - AssignedIPAddresses
+      - DeviceFromIP
+      - workspace
+      - cluster
+      - app
+      - database
+      - externaldata
+      - toscalar
+      - materialize
+      - datatable
+    banned_operators:
+      - let
+      - search
+      - find
+      - lookup
+      - evaluate
+      - invoke
+      - externaldata
+      - datatable
+      - range
+      - print
+      - partition
+      - facet
+      - fork
+
+governance:
+  human:
+    max_timespan_days: 90
+    max_result_rows: 5000
+    max_query_timeout_seconds: 180
+    max_concurrent_queries: 3
+    rate_limit_queries_per_minute: 10
+    max_result_size_mb: 10
+    max_entities: 500
+    max_schema_columns: 500
+    max_cell_chars: 4096
+    # Analysts hold Log Analytics Reader on this workspace directly, so an
+    # enumerated allowlist is friction, not a boundary (trust-model.md).
+    # tables.blocked is therefore the access policy for this tier - review it
+    # as one. allowed_tables below is the discovery fallback when live table
+    # enumeration is unavailable.
+    table_policy: "workspace"
+    # Still required: the discovery fallback when live enumeration fails.
+    allowed_tables: ["tier1", "tier2"]
+    allowed_tools:
+      - query_sentinel_logs
+      - get_incident
+      - get_incident_entities
+      - list_available_tables
+      - get_table_schema
+      # - query_defender_hunting 
+  agent:
+    max_timespan_days: 30
+    max_result_rows: 3000
+    max_query_timeout_seconds: 120
+    max_concurrent_queries: 2
+    rate_limit_queries_per_minute: 15
+    rate_limit_writes_per_minute: 3
+    max_result_size_mb: 5
+    max_entities: 500
+    max_schema_columns: 500
+    max_comment_chars: 30000
+    max_cell_chars: 4096
+    # Stays enumerated. The agent holds add_incident_comment, and an open read
+    # surface widens the input side of the indirect-injection chain in
+    # trust-model.md. Config._check enforces this pairing.
+    table_policy: "allowlist"
+    allowed_tables: ["tier1", "tier2"]
+    allowed_tools:
+      - query_sentinel_logs
+      - get_incident
+      - get_incident_entities
+      - list_available_tables
+      - get_table_schema
+      - add_incident_comment
+
+kql:
+  max_query_length: 4000
+  # Rejected when called as a function. Matched on the token stream, so any
+  # spacing before the "(" is caught. These reach outside this workspace or
+  # pull in a source the table check cannot see.
+  banned_functions:
+    - workspace
+    - cluster
+    - app
+    - database
+    - externaldata
+    - toscalar
+    - materialize
+    - datatable
+  # Rejected when used as an operator - at the start of the query or right
+  # after a "|". Positional matching means a column or alias named `range` or
+  # `print` is not a false positive.
+  #
+  # partition / facet / fork introduce a subquery in a position the source scan
+  # does not cover (including the brace form `partition by X {T}`), so they are
+  # banned rather than partially understood.
+  banned_operators:
+    - let
+    - search
+    - find
+    - lookup
+    - evaluate
+    - invoke
+    - externaldata
+    - datatable
+    - range
+    - print
+    - partition
+    - facet
+    - fork
+
+logging:
+  level: "INFO"
+  # Caller tiers whose raw KQL / comment text is written to the audit log.
+  # Humans are deliberately excluded: an analyst's query embeds the subject of
+  # the investigation. Their queries are still audited - as a sha256 prefix, a
+  # length and the resolved table list - so repeated or unusual activity stays
+  # detectable without mirroring the content.
+  log_query_text_for:
+    - agent
+  # Log the analyst's UPN next to their immutable object id. Turn off if your
+  # retention policy forbids storing it.
+  log_caller_upn: true

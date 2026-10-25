@@ -1,0 +1,207 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege. Individual jobs raise this only where they must.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  POETRY_VERSION: "2.1.4"
+
+jobs:
+  # ---------------------------------------------------------------------
+  hygiene:
+    name: Repository hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Only the example config is committed
+        run: |
+          leaked=$(git ls-files 'config/*.yaml' 'config/*.yml' \
+            | grep -v '^config/mcp-server-config\.example\.yaml$' || true)
+          if [ -n "$leaked" ]; then
+            echo "::error::per-tenant config file(s) are tracked and must not be:"
+            echo "$leaked"
+            echo "Each names a tenant, subscription, workspace and app registrations."
+            echo "Untrack with: git rm --cached <path>"
+            exit 1
+          fi
+          echo "OK - only the example config is tracked"
+
+      - name: Example config exists and is a template
+        run: |
+          test -f config/mcp-server-config.example.yaml \
+            || { echo "::error::config/mcp-server-config.example.yaml is missing - \
+          a clean clone cannot run the test suite"; exit 1; }
+          grep -q 'example.invalid' config/mcp-server-config.example.yaml \
+            || { echo "::error::the example config does not use an example.invalid \
+          base_url - it may contain a real hostname"; exit 1; }
+
+      - name: .gitignore covers the per-tenant config
+        run: |
+          grep -qE '^config/mcp-server-config\.yaml$' .gitignore \
+            || { echo "::error file=.gitignore::missing entry \
+          config/mcp-server-config.yaml"; exit 1; }
+
+      - name: Required documentation is present
+        run: |
+          for f in README.md trust-model.md ai-instructions.md EXTENDING.md \
+                   SECURITY.md LICENSE; do
+            test -f "$f" || { echo "::error::$f is missing"; exit 1; }
+          done
+      
+      - name: Async Azure transport is present in the image
+        run: |
+          docker run --rm --entrypoint python sentinel-mcp:ci -c \
+            "from azure.core.pipeline.transport import AioHttpTransport; print('aio transport OK')"
+
+  # ---------------------------------------------------------------------
+  test:
+    name: Tests (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install Poetry
+        run: |
+          pipx install "poetry==${POETRY_VERSION}"
+          pipx inject poetry poetry-plugin-export
+          poetry --version
+
+      - name: Lock file matches pyproject.toml
+        run: poetry check --lock
+
+      - name: Install
+        run: poetry install --with dev --no-interaction --no-ansi
+
+      # requirements.lock is what the image installs. If it drifts from
+      # poetry.lock, the image stops matching what was reviewed and scanned.
+      - name: requirements.lock is in sync with poetry.lock
+        run: |
+          poetry export --only main --format requirements.txt \
+            --output /tmp/requirements.lock
+          if ! diff -u requirements.lock /tmp/requirements.lock; then
+            echo "::error file=requirements.lock::stale. Regenerate with: \
+          poetry export --only main -f requirements.txt -o requirements.lock"
+            exit 1
+          fi
+
+      - name: requirements.lock is hash-pinned
+        run: |
+          grep -q 'sha256:' requirements.lock \
+            || { echo "::error file=requirements.lock::no hashes found - the \
+          image installs with --require-hashes and would fail"; exit 1; }
+
+      - name: pytest
+        run: poetry run pytest -q
+
+  # ---------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install "poetry==${POETRY_VERSION}"
+      - run: poetry install --with dev --no-interaction --no-ansi
+      - run: poetry run ruff check src tests
+      - run: poetry run ruff format --check src tests
+
+  # ---------------------------------------------------------------------
+  image:
+    name: Image build and supply-chain check
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # The Dockerfile copies config/mcp-server-config.yaml by name, and that
+      # file is deliberately gitignored. Synthesise it from the example so the
+      # build is exercised. The resulting image is NEVER pushed: its config
+      # points at example.invalid and it cannot start against a real tenant.
+      - name: Stage a placeholder config for the build
+        run: cp config/mcp-server-config.example.yaml config/mcp-server-config.yaml
+
+      - name: Build
+        run: docker build -t sentinel-mcp:ci .
+
+      # The image must contain exactly the reviewed dependency set. A mismatch
+      # means pip resolved something on its own or a layer was stale.
+      - name: Installed packages match requirements.lock
+        run: |
+          docker run --rm --entrypoint pip sentinel-mcp:ci \
+            freeze --disable-pip-version-check \
+            | cut -d= -f1 | tr 'A-Z_' 'a-z-' | sort -u \
+            | grep -vxE 'pip|setuptools|wheel' > /tmp/installed.txt
+          grep -oE '^[A-Za-z0-9._-]+==' requirements.lock \
+            | sed 's/==$//' | tr 'A-Z_' 'a-z-' | sort -u > /tmp/expected.txt
+          if ! diff -u /tmp/expected.txt /tmp/installed.txt; then
+            echo "::error::image contents differ from requirements.lock"
+            exit 1
+          fi
+
+      - name: Build context exclusions held
+        run: |
+          for path in /app/tests /app/README.md /app/poetry.lock /app/.git; do
+            if docker run --rm --entrypoint test sentinel-mcp:ci -e "$path"; then
+              echo "::error::$path is present in the image - check .dockerignore"
+              exit 1
+            fi
+          done
+
+      - name: Container does not run as root
+        run: |
+          user=$(docker run --rm --entrypoint id sentinel-mcp:ci -un)
+          test "$user" = "mcp" \
+            || { echo "::error::image runs as '$user', expected 'mcp'"; exit 1; }
+
+      - name: Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: sentinel-mcp:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+  # ---------------------------------------------------------------------
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
