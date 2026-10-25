@@ -15,6 +15,16 @@
 [tool.poetry]
 package-mode = false
 
+[[tool.poetry.source]]
+name = "safety"
+url = "https://pkgs.safetycli.com/repository/-f55ca/project/sentinel-mcp-server/pypi/simple/"
+priority = "primary"
+
+[tool.poetry-auto-export]
+output = "requirements.lock"
+without_hashes = false
+without = ["dev"]
+
 [project]
 name = "sentinel-mcp-server"
 version = "1.0.0"
