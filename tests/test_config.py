@@ -1,4 +1,5 @@
 """Config must fail CLOSED and fail at STARTUP."""
+
 import copy
 import glob
 import os
@@ -15,9 +16,7 @@ from src.config import Config, load_config
 
 from ._support import AGENT_APP_ID, config, defender_config
 
-CONFIG_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config"
-)
+CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config")
 TOOLS_DIR = pathlib.Path(__file__).resolve().parent.parent / "src" / "tools"
 
 
@@ -27,8 +26,7 @@ TOOLS_DIR = pathlib.Path(__file__).resolve().parent.parent / "src" / "tools"
 #:
 #: MUST come after CONFIG_DIR - this is module level, not a function body.
 _LOCAL_CONFIGS = sorted(
-    p for p in glob.glob(os.path.join(CONFIG_DIR, "*.yaml"))
-    if not p.endswith(".example.yaml")
+    p for p in glob.glob(os.path.join(CONFIG_DIR, "*.yaml")) if not p.endswith(".example.yaml")
 )
 
 
@@ -60,8 +58,10 @@ def _expect_invalid(mutate, base=None) -> None:
         return
     raise AssertionError("config should have been rejected")
 
+
 @pytest.mark.parametrize(
-    "path", _LOCAL_CONFIGS or [None],
+    "path",
+    _LOCAL_CONFIGS or [None],
     ids=[os.path.basename(p) for p in _LOCAL_CONFIGS] or ["none-present"],
 )
 def test_local_configs_are_valid(path):
@@ -81,21 +81,24 @@ def test_only_the_example_config_is_tracked_by_git():
     try:
         tracked = subprocess.run(
             ["git", "ls-files", "config/"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
             cwd=os.path.dirname(CONFIG_DIR),
         ).stdout.split()
     except (OSError, subprocess.SubprocessError):
         pytest.skip("git not available")
     if not tracked:
         pytest.skip("not a git checkout")
-    leaked = [p for p in tracked
-              if p.endswith((".yaml", ".yml"))
-              and not p.endswith("mcp-server-config.example.yaml")]
+    leaked = [
+        p
+        for p in tracked
+        if p.endswith((".yaml", ".yml")) and not p.endswith("mcp-server-config.example.yaml")
+    ]
     assert not leaked, f"per-tenant config(s) tracked by git: {leaked}"
 
-CONFIG_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config"
-)
+
+CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config")
 
 
 def _raw() -> dict:
@@ -148,8 +151,10 @@ def test_table_checks_are_case_insensitive():
 
 def test_typo_in_a_blocklist_key_is_rejected():
     """The original model silently accepted this and ran with an empty blocklist."""
+
     def mutate(d):
         d["kql"]["banned_function"] = d["kql"].pop("banned_functions")
+
     _expect_invalid(mutate)
 
 
@@ -163,7 +168,9 @@ def test_empty_blocked_tables_rejected():
 
 
 def test_unknown_tool_name_rejected():
-    _expect_invalid(lambda d: d["governance"]["human"]["allowed_tools"].append("query_sentinal_logs"))
+    _expect_invalid(
+        lambda d: d["governance"]["human"]["allowed_tools"].append("query_sentinal_logs")
+    )
 
 
 def test_unknown_tier_rejected():
@@ -175,7 +182,9 @@ def test_missing_tier_rejected():
 
 
 def test_human_may_not_hold_a_write_tool():
-    _expect_invalid(lambda d: d["governance"]["human"]["allowed_tools"].append("add_incident_comment"))
+    _expect_invalid(
+        lambda d: d["governance"]["human"]["allowed_tools"].append("add_incident_comment")
+    )
 
 
 def test_http_base_url_rejected():
@@ -226,6 +235,7 @@ def test_per_tier_caps_are_present_and_positive():
         assert tier.max_cell_chars > 0
         assert tier.max_result_size_bytes == tier.max_result_size_mb * 1024 * 1024
 
+
 def test_workspace_policy_allows_an_unlisted_table():
     c = config()
     if c.table_policy_for("human") != "workspace":
@@ -258,15 +268,19 @@ def test_workspace_policy_with_a_write_tool_is_rejected():
 def test_unknown_table_policy_rejected():
     _expect_invalid(lambda d: d["governance"]["human"].update(table_policy="everything"))
 
+
 def test_testing_agent_not_in_identity_allowed():
     c = config()
     assert AGENT_APP_ID not in c.identity.allowed_agent_app_ids
 
+
 def test_all_http_client_loggers_are_pinned():
     """Any HTTP client in the image must be pinned to WARNING (report M-7)."""
     from src.logging_setup import _NOISY_LOGGERS
+
     for name in ("httpx", "httpcore", "httpx2", "httpcore2", "urllib3"):
         assert name in _NOISY_LOGGERS, f"{name} would log request URLs at DEBUG"
+
 
 # ---- Defender hunting ---------------------------------------------------
 #
@@ -293,9 +307,11 @@ def test_defender_overlay_used_by_the_tests_is_a_valid_policy():
 def test_hunting_tool_requires_defender_enabled():
     """The failure an operator hits when they flip enabled to false and forget
     the tool entry. Enabling/disabling is two edits."""
+
     def mutate(d):
         d["governance"]["human"]["allowed_tools"].append("query_defender_hunting")
         d["defender"]["enabled"] = False
+
     _expect_invalid(mutate)
 
 
@@ -306,10 +322,12 @@ def test_hunting_tool_cannot_coexist_with_a_write_tool():
     Runs against the ENABLED overlay: against the example it would trip the
     'defender disabled' branch first and never reach this rule.
     """
+
     def mutate(d):
         tools = d["governance"]["agent"]["allowed_tools"]
         assert "add_incident_comment" in tools, "agent tier lost its write tool"
         tools.append("query_defender_hunting")
+
     _expect_invalid(mutate, base=_defender_raw())
 
 
@@ -317,43 +335,47 @@ def test_hunting_tool_is_human_tier_only():
     """The human-tier restriction, isolated from the write-tool rule: strip the
     agent's write tool first, so the rejection can only come from the tier
     check. Unscoped tenant-wide access requires an accountable named caller."""
+
     def mutate(d):
         agent = d["governance"]["agent"]
-        agent["allowed_tools"] = [t for t in agent["allowed_tools"]
-                                  if t != "add_incident_comment"]
+        agent["allowed_tools"] = [t for t in agent["allowed_tools"] if t != "add_incident_comment"]
         agent["allowed_tools"].append("query_defender_hunting")
+
     _expect_invalid(mutate, base=_defender_raw())
 
 
 def test_defender_timeout_must_be_under_the_request_deadline():
     """A hunting call that outlives the global deadline is cancelled mid-flight
     and the quota is spent for nothing."""
-    _expect_invalid(lambda d: d["defender"].update(timeout_seconds=500),
-                    base=_defender_raw())
+    _expect_invalid(lambda d: d["defender"].update(timeout_seconds=500), base=_defender_raw())
 
 
 def test_defender_cannot_resolve_to_zero_tables():
     def mutate(d):
         d["defender"]["blocked_tables"] = list(d["defender"]["allowed_tables"])
+
     _expect_invalid(mutate, base=_defender_raw())
 
 
 def test_defender_empty_allowed_tables_rejected():
-    _expect_invalid(lambda d: d["defender"].update(allowed_tables=[]),
-                    base=_defender_raw())
+    _expect_invalid(lambda d: d["defender"].update(allowed_tables=[]), base=_defender_raw())
 
 
 def test_defender_empty_banned_lists_rejected():
-    _expect_invalid(lambda d: d["defender"]["kql"].update(banned_functions=[]),
-                    base=_defender_raw())
-    _expect_invalid(lambda d: d["defender"]["kql"].update(banned_operators=[]),
-                    base=_defender_raw())
+    _expect_invalid(
+        lambda d: d["defender"]["kql"].update(banned_functions=[]), base=_defender_raw()
+    )
+    _expect_invalid(
+        lambda d: d["defender"]["kql"].update(banned_operators=[]), base=_defender_raw()
+    )
 
 
 def test_defender_typo_in_a_key_is_rejected():
     """extra='forbid' must hold inside the nested Defender models too."""
+
     def mutate(d):
         d["defender"]["banned_function"] = d["defender"]["kql"].pop("banned_functions")
+
     _expect_invalid(mutate, base=_defender_raw())
 
 
@@ -366,12 +388,14 @@ def test_enrichment_functions_are_banned_in_the_shipped_defender_profile():
     for fn in ("fileprofile", "seenby", "assignedipaddresses", "devicefromip"):
         assert fn in banned, f"{fn} must stay banned"
 
+
 def test_async_azure_transport_is_installed():
     """azure-core has no built-in async transport - AioHttpTransport imports
     aiohttp lazily. Without it every .aio client raises ImportError at call
     time, with duration_ms=0 and no network I/O. Not transitive: neither
     azure-identity nor azure-monitor-query requests the [aio] extra."""
     from azure.core.pipeline.transport import AioHttpTransport  # noqa: F401
+
 
 def _is_registered(name: str) -> bool:
     """True when FastMCP will serve a tool under `name`.
@@ -411,8 +435,12 @@ def _mcp_tool_registrations() -> dict:
         found[default_name] = path.name
 
     def _is_mcp_tool(node) -> bool:
-        return (isinstance(node, ast.Attribute) and node.attr == "tool"
-                and isinstance(node.value, ast.Name) and node.value.id == "mcp")
+        return (
+            isinstance(node, ast.Attribute)
+            and node.attr == "tool"
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "mcp"
+        )
 
     for path in sorted(TOOLS_DIR.glob("*.py")):
         tree = ast.parse(path.read_text())
@@ -426,8 +454,7 @@ def _mcp_tool_registrations() -> dict:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 for dec in node.decorator_list:
                     target, keywords = (
-                        (dec.func, dec.keywords) if isinstance(dec, ast.Call)
-                        else (dec, ())
+                        (dec.func, dec.keywords) if isinstance(dec, ast.Call) else (dec, ())
                     )
                     if _is_mcp_tool(target):
                         _record(node.name, keywords, path)
@@ -457,8 +484,7 @@ def test_every_registration_is_a_known_tool():
     in allowed_tools, so no caller can ever reach it."""
     from src.config import KNOWN_TOOLS
 
-    extra = {n: f for n, f in _mcp_tool_registrations().items()
-             if n not in KNOWN_TOOLS}
+    extra = {n: f for n, f in _mcp_tool_registrations().items() if n not in KNOWN_TOOLS}
     assert not extra, (
         f"registered with FastMCP but absent from KNOWN_TOOLS: {extra}. "
         "Config validation rejects unknown names in allowed_tools, so this tool "
@@ -474,7 +500,8 @@ def test_source_registrations_all_reach_the_live_server():
     error anywhere - the tool simply does not exist.
     """
     dead = sorted(
-        f"{name} ({file})" for name, file in _mcp_tool_registrations().items()
+        f"{name} ({file})"
+        for name, file in _mcp_tool_registrations().items()
         if not _is_registered(name)
     )
     assert not dead, (
@@ -483,8 +510,10 @@ def test_source_registrations_all_reach_the_live_server():
         "bottom of src/server.py."
     )
 
+
 @pytest.mark.parametrize(
-    "path", _LOCAL_CONFIGS or [None],
+    "path",
+    _LOCAL_CONFIGS or [None],
     ids=[os.path.basename(p) for p in _LOCAL_CONFIGS] or ["none-present"],
 )
 def test_local_config_tools_are_all_registered(path):

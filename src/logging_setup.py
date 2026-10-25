@@ -13,6 +13,7 @@ Two things here are load-bearing.
    verbatim for reviewability (report H-2). Query RESULTS are never logged by
    anything, at any tier.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -154,9 +155,19 @@ class AuditLogger:
 
     # ---- events --------------------------------------------------------
 
-    def log_tool_call(self, caller, tool, arguments=None, result_row_count=None, truncated=None,
-                      duration_ms=None, validation_result="passed", executed_kql=None,
-                      tables=None, **extra) -> None:
+    def log_tool_call(
+        self,
+        caller,
+        tool,
+        arguments=None,
+        result_row_count=None,
+        truncated=None,
+        duration_ms=None,
+        validation_result="passed",
+        executed_kql=None,
+        tables=None,
+        **extra,
+    ) -> None:
         caller_type = getattr(caller, "type", None)
         payload = self._redact(caller_type, arguments)
         if executed_kql is not None:

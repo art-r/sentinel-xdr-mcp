@@ -1,4 +1,5 @@
 """Pure helpers, no cloud/framework deps (unit-testable)."""
+
 from __future__ import annotations
 
 import re

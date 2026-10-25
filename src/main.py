@@ -5,6 +5,7 @@ path runs the *same* `app` object rather than mcp.run(), so a locally started
 server has exactly the same middleware stack (host-header validation included)
 as the container.
 """
+
 from src.server import app, config, mcp  # noqa: F401
 
 UVICORN_OPTIONS = dict(

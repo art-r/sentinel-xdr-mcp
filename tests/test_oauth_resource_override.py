@@ -9,6 +9,7 @@ The routes are driven over raw ASGI. FastMCP registers this endpoint as a
 CORSMiddleware instance, so it cannot be called as `endpoint(request)`, and a
 hand-rolled driver keeps the test free of an HTTP-client dependency.
 """
+
 import asyncio
 import json
 from types import SimpleNamespace
@@ -56,9 +57,7 @@ def _call(route, method="GET", host=None):
     asyncio.run(route.handle(scope, receive, send))
 
     start = next(m for m in messages if m["type"] == "http.response.start")
-    body = b"".join(
-        m.get("body", b"") for m in messages if m["type"] == "http.response.body"
-    )
+    body = b"".join(m.get("body", b"") for m in messages if m["type"] == "http.response.body")
     headers = {k.decode().lower(): v.decode("latin-1") for k, v in start["headers"]}
     return start["status"], headers, body
 
@@ -93,9 +92,7 @@ def test_advertised_resource_is_the_scope_prefix():
     cfg = config()
     if cfg.identity.oauth_resource_id is None:
         pytest.skip("override disabled in the shipped config")
-    assert cfg.identity.delegated_scope_uri.startswith(
-        cfg.identity.oauth_resource_id + "/"
-    )
+    assert cfg.identity.delegated_scope_uri.startswith(cfg.identity.oauth_resource_id + "/")
 
 
 def test_override_preserves_every_other_field():

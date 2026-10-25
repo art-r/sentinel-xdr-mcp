@@ -3,6 +3,7 @@
 Byte capping is linear: estimate the per-row cost once from a sample and slice,
 rather than re-serialising the whole payload in a shrink loop.
 """
+
 from __future__ import annotations
 
 import json
@@ -33,8 +34,12 @@ def _cap_rows_by_size(rows: list, max_size_bytes: int, overhead: int) -> list:
     return rows[:keep]
 
 
-def truncate(result: dict, max_rows: int, max_size_bytes: int | None = None,
-             max_cell_chars: int = MAX_CELL_CHARS) -> dict:
+def truncate(
+    result: dict,
+    max_rows: int,
+    max_size_bytes: int | None = None,
+    max_cell_chars: int = MAX_CELL_CHARS,
+) -> dict:
     """Apply the row cap, the byte cap and cell scrubbing, reporting each one.
 
     `max_rows` must be the same ceiling KQLValidator._enforce_row_limit compiled
@@ -84,8 +89,12 @@ def truncate(result: dict, max_rows: int, max_size_bytes: int | None = None,
     return out
 
 
-def truncate_list(items: list, max_items: int, max_size_bytes: int | None = None,
-                  max_cell_chars: int = MAX_CELL_CHARS) -> dict:
+def truncate_list(
+    items: list,
+    max_items: int,
+    max_size_bytes: int | None = None,
+    max_cell_chars: int = MAX_CELL_CHARS,
+) -> dict:
     """Row/byte caps for the non-tabular tools (entities, schema)."""
     actual = len(items)
     kept = items[:max_items]

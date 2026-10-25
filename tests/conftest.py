@@ -4,6 +4,7 @@ CONFIG_PATH is set BEFORE anything under src/ is imported: src.server calls
 load_config() at import time, so the order of the statements in this file is
 load-bearing.
 """
+
 import os
 import sys
 
@@ -14,9 +15,7 @@ sys.path.insert(0, ROOT)
 # otherwise silently change what the suite validates, and the same commit would
 # pass locally and fail in CI. Per-tenant configs are validated separately by
 # test_config.test_local_configs_are_valid.
-os.environ["CONFIG_PATH"] = os.path.join(
-    ROOT, "config", "mcp-server-config.example.yaml"
-)
+os.environ["CONFIG_PATH"] = os.path.join(ROOT, "config", "mcp-server-config.example.yaml")
 
 import pytest  # noqa: E402
 
@@ -70,7 +69,8 @@ def env(monkeypatch):
 
     def _as(claims):
         monkeypatch.setattr(
-            current_mod, "get_access_token",
+            current_mod,
+            "get_access_token",
             lambda: None if claims is None else _Token(claims),
         )
 
@@ -93,8 +93,7 @@ def defender_env(env, monkeypatch):
     """
     cfg = defender_config()
     monkeypatch.setattr(srv.deps, "config", cfg)
-    monkeypatch.setattr(srv.deps, "defender_kql_validator",
-                        KQLValidator(cfg, source="defender"))
+    monkeypatch.setattr(srv.deps, "defender_kql_validator", KQLValidator(cfg, source="defender"))
     monkeypatch.setattr(srv.deps, "kql_validator", KQLValidator(cfg, source="law"))
     monkeypatch.setattr(srv.deps, "audit", AuditLogger(cfg, logger=env.log))
     return env

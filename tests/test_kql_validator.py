@@ -3,6 +3,7 @@ implementations accepted (report.md section 3, and finding H-1). Every REJECT
 entry below was empirically verified as ACCEPTED by the implementation that
 preceded the fix for it.
 """
+
 import pytest
 
 from src.governance.kql_validator import KQLValidator, clean_query, tokenize
@@ -194,10 +195,14 @@ def test_blocked_tables_are_rejected_for_every_tier():
     for the open tier too."""
     v = _v()
     for tier in ("human", "agent"):
-        for q in ("Heartbeat | take 10", "heartbeat | take 10", "HeArTbEaT | take 10",
-                  "Usage | summarize count()",
-                  "union (SecurityAlert | take 5), (Heartbeat)",
-                  "SecurityAlert | where Computer in (Heartbeat) | take 5"):
+        for q in (
+            "Heartbeat | take 10",
+            "heartbeat | take 10",
+            "HeArTbEaT | take 10",
+            "Usage | summarize count()",
+            "union (SecurityAlert | take 5), (Heartbeat)",
+            "SecurityAlert | where Computer in (Heartbeat) | take 5",
+        ):
             assert not v.validate(q, tier).is_valid, f"should reject for {tier}: {q!r}"
 
 
@@ -272,6 +277,7 @@ def test_every_union_branch_is_reported():
     r = _v().validate("union (SecurityAlert | take 5), (SigninLogs), (AuditLogs) | take 5", "human")
     assert r.is_valid
     assert {t.lower() for t in r.extracted_tables} == {"securityalert", "signinlogs", "auditlogs"}
+
 
 def test_take_exactly_at_the_cap_is_bumped_to_the_probe():
     """`take 5000` must not return a full page flagged complete (report D-5)."""

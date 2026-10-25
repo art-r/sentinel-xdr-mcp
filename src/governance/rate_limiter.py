@@ -4,6 +4,7 @@ Both are bounded: entries are swept on expiry and the window map is capped, so
 memory is not a monotonically increasing function of distinct caller IDs.
 In-memory means per-replica - keep min=max=1 replicas or move to a shared store.
 """
+
 from __future__ import annotations
 
 import asyncio

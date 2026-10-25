@@ -1,4 +1,5 @@
 """Shared test helpers. No cloud dependencies."""
+
 from __future__ import annotations
 
 import copy
@@ -10,6 +11,7 @@ from src.config import load_config, Config
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(ROOT, "config", "mcp-server-config.example.yaml")
 AGENT_APP_ID = "11111111-2222-3333-4444-555555555555"  # test-only, not policy
+
 
 class _Omit:
     def __repr__(self):
@@ -35,23 +37,29 @@ def human_claims(**overrides) -> dict:
     roles = [cfg.identity.required_human_role]
     if cfg.defender is not None:
         roles.append(cfg.defender.required_role)
-    return _merge({
-        "oid": "aaaaaaaa-0000-0000-0000-000000000001",
-        "azp": cfg.identity.allowed_client_app_ids[0],
-        "scp": cfg.identity.required_delegated_scope,
-        "roles": roles,
-        "preferred_username": "analyst@corp.example",
-    }, overrides)
+    return _merge(
+        {
+            "oid": "aaaaaaaa-0000-0000-0000-000000000001",
+            "azp": cfg.identity.allowed_client_app_ids[0],
+            "scp": cfg.identity.required_delegated_scope,
+            "roles": roles,
+            "preferred_username": "analyst@corp.example",
+        },
+        overrides,
+    )
 
 
 def agent_claims(**overrides) -> dict:
     cfg = config()
-    return _merge({
-        "idtyp": "app",
-        "appid": AGENT_APP_ID,
-        "azp": cfg.identity.allowed_agent_app_ids[0],
-        "roles": [cfg.identity.required_agent_role],
-    }, overrides)
+    return _merge(
+        {
+            "idtyp": "app",
+            "appid": AGENT_APP_ID,
+            "azp": cfg.identity.allowed_agent_app_ids[0],
+            "roles": [cfg.identity.required_agent_role],
+        },
+        overrides,
+    )
 
 
 class CollectingLogger:
@@ -78,7 +86,9 @@ class CollectingLogger:
 
     def dumps(self) -> str:
         import json
+
         return json.dumps(self.events, default=str)
+
 
 # --- config variants ----------------------------------------------------
 
@@ -113,14 +123,33 @@ _DEFENDER_OVERLAY = {
     "kql": {
         "max_query_length": 4000,
         "banned_functions": [
-            "FileProfile", "SeenBy", "AssignedIPAddresses", "DeviceFromIP",
-            "workspace", "cluster", "app", "database", "externaldata",
-            "toscalar", "materialize", "datatable",
+            "FileProfile",
+            "SeenBy",
+            "AssignedIPAddresses",
+            "DeviceFromIP",
+            "workspace",
+            "cluster",
+            "app",
+            "database",
+            "externaldata",
+            "toscalar",
+            "materialize",
+            "datatable",
         ],
         "banned_operators": [
-            "let", "search", "find", "lookup", "evaluate", "invoke",
-            "externaldata", "datatable", "range", "print", "partition",
-            "facet", "fork",
+            "let",
+            "search",
+            "find",
+            "lookup",
+            "evaluate",
+            "invoke",
+            "externaldata",
+            "datatable",
+            "range",
+            "print",
+            "partition",
+            "facet",
+            "fork",
         ],
     },
 }
@@ -159,8 +188,12 @@ class _Token:
 
 class FakeLAW:
     def __init__(self, result=None, exc=None):
-        self.result = result or {"columns": ["C"], "rows": [["v"]], "partial": False,
-                                 "partial_error": None}
+        self.result = result or {
+            "columns": ["C"],
+            "rows": [["v"]],
+            "partial": False,
+            "partial_error": None,
+        }
         self.exc = exc
         self.last_kql = None
         self.last_timespan = None
@@ -184,8 +217,7 @@ class FakeLAW:
 
         if self.exc:
             raise self.exc
-        return parse_datatype_names(
-            await self.query("Usage | summarize by DataType", None, 60))
+        return parse_datatype_names(await self.query("Usage | summarize by DataType", None, 60))
 
     async def check_workspace_access(self):
         self.ready_calls += 1
@@ -223,8 +255,12 @@ class FakeSentinel:
 
 class FakeDefender:
     def __init__(self, payload=None, exc=None):
-        self.payload = payload or {"columns": ["DeviceName"], "rows": [["host1"]],
-                                   "partial": False, "partial_error": None}
+        self.payload = payload or {
+            "columns": ["DeviceName"],
+            "rows": [["host1"]],
+            "partial": False,
+            "partial_error": None,
+        }
         self.exc = exc
         self.last_kql = None
 

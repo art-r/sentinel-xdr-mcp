@@ -140,8 +140,9 @@ class Deps:
                 # defect that would otherwise be indistinguishable from a
                 # workspace outage, and would silently pin discovery to the
                 # configured fallback list for the life of the revision.
-                log.warning("workspace_table_discovery_failed",
-                            error=type(exc).__name__, exc_info=True)
+                log.warning(
+                    "workspace_table_discovery_failed", error=type(exc).__name__, exc_info=True
+                )
                 return tables
             self._tables = (time.monotonic(), tuple(sorted(set(names))))
             return self._tables[1]
@@ -167,7 +168,9 @@ deps = Deps(config)
 
 @asynccontextmanager
 async def _lifespan(_server):
-    log.info("server_starting", base_url=str(config.server.base_url), dev_mode=config.server.dev_mode)
+    log.info(
+        "server_starting", base_url=str(config.server.base_url), dev_mode=config.server.dev_mode
+    )
     try:
         yield
     finally:
@@ -205,8 +208,7 @@ async def ready(request):
     if not config.server.expose_ready_probe:
         return JSONResponse({"status": "disabled"}, status_code=404)
     ok, _detail = await deps.check_ready()
-    return JSONResponse({"status": "ready" if ok else "unready"},
-                        status_code=200 if ok else 503)
+    return JSONResponse({"status": "ready" if ok else "unready"}, status_code=200 if ok else 503)
 
 
 from src.tools import comments, defender, incidents, query_logs, schema_discovery  # noqa: E402,F401

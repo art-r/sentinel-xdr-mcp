@@ -5,6 +5,7 @@ Uses `defender_env` rather than `env`: the shipped example config has
 defender.enabled false, which is the right default for a new tenant and the
 wrong default for a test suite.
 """
+
 import asyncio
 
 import pytest
@@ -41,6 +42,7 @@ class _RaisingDefender:
 
 # ---- happy path --------------------------------------------------------
 
+
 def test_tvm_table_is_reachable(defender_env):
     """The reason this integration exists: TVM tables hold no data in Sentinel."""
     defender_env.act_as(defender_human_claims())
@@ -68,10 +70,10 @@ def test_audit_record_names_the_source(defender_env):
 
 # ---- authorisation -----------------------------------------------------
 
+
 def test_missing_defender_role_is_denied(defender_env):
     """Sentinel.Read alone must not reach the hunting corpus."""
-    defender_env.act_as(
-        defender_human_claims(roles=[config().identity.required_human_role]))
+    defender_env.act_as(defender_human_claims(roles=[config().identity.required_human_role]))
     with pytest.raises(ToolError):
         asyncio.run(_tool()(kql="DeviceInfo | take 5", ctx=None))
     assert defender_env.defender.last_kql is None
@@ -94,6 +96,7 @@ def test_unauthenticated_caller_is_refused(defender_env):
 
 
 # ---- validator profile -------------------------------------------------
+
 
 def test_enrichment_functions_are_rejected(defender_env):
     """They return data beyond the named tables, which would make
@@ -134,10 +137,12 @@ def test_defender_tables_are_an_explicit_allowlist():
 
 # ---- failure paths -----------------------------------------------------
 
+
 def test_upstream_error_text_never_escapes(defender_env, monkeypatch):
     defender_env.act_as(defender_human_claims())
-    monkeypatch.setattr(srv.deps, "_defender_client",
-                        _RaisingDefender(HuntingUnavailable("HTTPStatusError")))
+    monkeypatch.setattr(
+        srv.deps, "_defender_client", _RaisingDefender(HuntingUnavailable("HTTPStatusError"))
+    )
     with pytest.raises(ToolError) as err:
         asyncio.run(_tool()(kql="DeviceInfo | take 5", ctx=None))
     assert "HTTPStatusError" not in str(err.value)
@@ -147,8 +152,9 @@ def test_upstream_error_text_never_escapes(defender_env, monkeypatch):
 
 def test_quota_exhaustion_is_audited(defender_env, monkeypatch):
     defender_env.act_as(defender_human_claims())
-    monkeypatch.setattr(srv.deps, "_defender_client",
-                        _RaisingDefender(HuntingQuotaExhausted("budget gone")))
+    monkeypatch.setattr(
+        srv.deps, "_defender_client", _RaisingDefender(HuntingQuotaExhausted("budget gone"))
+    )
     with pytest.raises(ToolError):
         asyncio.run(_tool()(kql="DeviceInfo | take 5", ctx=None))
     assert defender_env.log.of("access_denied")[0]["reason"] == "defender_quota_exhausted"
@@ -157,8 +163,10 @@ def test_quota_exhaustion_is_audited(defender_env, monkeypatch):
 def test_results_are_never_logged(defender_env):
     defender_env.act_as(defender_human_claims())
     defender_env.defender.payload = {
-        "columns": ["Cve"], "rows": [["CVE-SECRETPAYLOAD"]],
-        "partial": False, "partial_error": None,
+        "columns": ["Cve"],
+        "rows": [["CVE-SECRETPAYLOAD"]],
+        "partial": False,
+        "partial_error": None,
     }
     out = asyncio.run(_tool()(kql="DeviceTvmSoftwareVulnerabilities | take 5", ctx=None))
     assert out["rows"][0][0] == "CVE-SECRETPAYLOAD"
@@ -173,6 +181,7 @@ def test_output_is_labelled_untrusted(defender_env):
 
 # ---- disabled path -----------------------------------------------------
 
+
 def test_tool_refuses_when_defender_is_disabled(env):
     """Plain `env`: the shipped example config has defender disabled."""
     if config().defender is not None and config().defender.enabled:
@@ -185,12 +194,15 @@ def test_tool_refuses_when_defender_is_disabled(env):
 
 # ---- graph response shape ----------------------------------------------
 
+
 def test_graph_response_shape_is_converted():
     """Column order comes from `schema`, so a row missing a key still aligns."""
-    out = _to_table({
-        "schema": [{"Name": "A", "Type": "String"}, {"Name": "B", "Type": "Int"}],
-        "results": [{"A": "x", "B": 1}, {"B": 2}],
-    })
+    out = _to_table(
+        {
+            "schema": [{"Name": "A", "Type": "String"}, {"Name": "B", "Type": "Int"}],
+            "results": [{"A": "x", "B": 1}, {"B": 2}],
+        }
+    )
     assert out["columns"] == ["A", "B"]
     assert out["rows"] == [["x", 1], [None, 2]]
 

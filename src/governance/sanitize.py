@@ -8,6 +8,7 @@ This does not "solve" indirect prompt injection - it removes the cheap tricks
 (control characters, zero-width and bidi runs, unbounded cells) and every
 data-returning tool additionally labels its payload as untrusted.
 """
+
 from __future__ import annotations
 
 import re
@@ -51,8 +52,10 @@ def scrub_value(value, max_chars: int = MAX_CELL_CHARS, _depth: int = 0):
     if _depth >= 6:
         return value
     if isinstance(value, dict):
-        return {scrub_text(str(k), max_chars): scrub_value(v, max_chars, _depth + 1)
-                for k, v in value.items()}
+        return {
+            scrub_text(str(k), max_chars): scrub_value(v, max_chars, _depth + 1)
+            for k, v in value.items()
+        }
     if isinstance(value, (list, tuple)):
         return [scrub_value(v, max_chars, _depth + 1) for v in value]
     return value

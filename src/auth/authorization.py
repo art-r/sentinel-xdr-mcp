@@ -17,6 +17,7 @@ Token-type discrimination is explicit and must stay that way: a delegated token
 that happens to carry `roles: ["MCP.Agent"]` must never be treated as the agent,
 otherwise a user assigned the wrong role gains write access.
 """
+
 from __future__ import annotations
 
 from .caller import CallerContext
@@ -56,8 +57,11 @@ def authorize(claims: dict, config) -> CallerContext | None:
         if app_id not in ident.allowed_agent_app_ids:
             return None
         return CallerContext(
-            type="agent", id=app_id, name="investigation-agent",
-            client_app_id=app_id, claims=claims,
+            type="agent",
+            id=app_id,
+            name="investigation-agent",
+            client_app_id=app_id,
+            claims=claims,
         )
 
     oid = claims.get("oid")
@@ -72,9 +76,11 @@ def authorize(claims: dict, config) -> CallerContext | None:
     if app_id not in ident.allowed_client_app_ids:
         return None
     return CallerContext(
-        type="human", id=oid,
+        type="human",
+        id=oid,
         name=claims.get("preferred_username") or claims.get("upn") or "unknown",
-        client_app_id=app_id, claims=claims,
+        client_app_id=app_id,
+        claims=claims,
     )
 
 

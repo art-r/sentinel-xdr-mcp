@@ -16,12 +16,22 @@ _MAX_KQL_CHARS = deps.config.kql.max_query_length
 
 
 async def query_sentinel_logs(
-    kql: Annotated[str, Field(min_length=1, max_length=_MAX_KQL_CHARS,
-                              description="KQL query to run against the Log Analytics Workspace")],
+    kql: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=_MAX_KQL_CHARS,
+            description="KQL query to run against the Log Analytics Workspace",
+        ),
+    ],
     ctx: Context,
-    timespan: Annotated[str, Field(
-        pattern=TIMESPAN_PATTERN,
-        description="ISO-8601 duration ceiling, e.g. P1D, P7D, PT6H (default P1D)")] = "P1D",
+    timespan: Annotated[
+        str,
+        Field(
+            pattern=TIMESPAN_PATTERN,
+            description="ISO-8601 duration ceiling, e.g. P1D, P7D, PT6H (default P1D)",
+        ),
+    ] = "P1D",
 ) -> dict:
     """Execute a KQL query against the Log Analytics Workspace.
 
@@ -42,15 +52,17 @@ async def query_sentinel_logs(
 
     result = deps.kql_validator.validate(kql, caller.type)
     if not result.is_valid:
-        deps.audit.log_tool_call(caller, "query_sentinel_logs", args,
-                                 validation_result=f"rejected: {result.error}")
+        deps.audit.log_tool_call(
+            caller, "query_sentinel_logs", args, validation_result=f"rejected: {result.error}"
+        )
         raise ToolError(f"KQL validation failed: {result.error}")
 
     try:
         span = parse_and_cap_timespan(timespan, gov.max_timespan_days)
     except ValueError as exc:
-        deps.audit.log_tool_call(caller, "query_sentinel_logs", args,
-                                 validation_result=f"rejected: {exc}")
+        deps.audit.log_tool_call(
+            caller, "query_sentinel_logs", args, validation_result=f"rejected: {exc}"
+        )
         raise ToolError(str(exc)) from None
 
     # Rate and concurrency limits are enforced by AuthorizationMiddleware for
@@ -59,8 +71,13 @@ async def query_sentinel_logs(
     try:
         raw = await deps.law_client.query(result.sanitized_kql, span, gov.max_query_timeout_seconds)
     except Exception as exc:
-        deps.audit.log_tool_failure(caller, "query_sentinel_logs", args, error=exc,
-                                    duration_ms=int((time.monotonic() - start) * 1000))
+        deps.audit.log_tool_failure(
+            caller,
+            "query_sentinel_logs",
+            args,
+            error=exc,
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
         # Generic message on purpose: an Azure error string commonly echoes the
         # failing query fragment back to the caller and into the logs.
         raise ToolError(
@@ -95,8 +112,7 @@ async def query_sentinel_logs(
         if deps.config.table_policy_for(caller.type) == "workspace":
             live = {name.lower() for name in await deps.workspace_tables()}
             if live:
-                absent = sorted(t for t in result.extracted_tables
-                                if t.lower() not in live)
+                absent = sorted(t for t in result.extracted_tables if t.lower() not in live)
                 if absent:
                     out["note"] = (
                         f"No rows returned. Table(s) {absent} exist in the workspace "
@@ -104,15 +120,20 @@ async def query_sentinel_logs(
                         "Vulnerability Management tables (DeviceTvm*) in particular "
                         "are schema-only in Sentinel - query them with "
                         "query_defender_hunting instead, and call "
-                        "list_available_tables(source=\"defender\") to see what is "
+                        'list_available_tables(source="defender") to see what is '
                         "reachable there. Do not report this as 'no findings'."
                     )
 
-    deps.audit.log_tool_call(caller, "query_sentinel_logs", args,
-                             executed_kql=result.sanitized_kql,
-                             tables=result.extracted_tables,
-                             result_row_count=out["row_count"], truncated=out["truncated"],
-                             duration_ms=int((time.monotonic() - start) * 1000))
+    deps.audit.log_tool_call(
+        caller,
+        "query_sentinel_logs",
+        args,
+        executed_kql=result.sanitized_kql,
+        tables=result.extracted_tables,
+        result_row_count=out["row_count"],
+        truncated=out["truncated"],
+        duration_ms=int((time.monotonic() - start) * 1000),
+    )
     return out
 
 

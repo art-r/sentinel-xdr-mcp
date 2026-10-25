@@ -6,6 +6,7 @@ from azure.identity.aio import ManagedIdentityCredential
 from azure.monitor.query import LogsQueryStatus
 from azure.monitor.query.aio import LogsQueryClient
 
+
 def parse_datatype_names(result: dict) -> list[str]:
     """Table names from a `Usage | summarize by DataType` result.
 
@@ -18,6 +19,7 @@ def parse_datatype_names(result: dict) -> list[str]:
         return []
     index = columns.index("DataType")
     return [str(row[index]) for row in result.get("rows") or [] if row[index]]
+
 
 class LAWClient:
     """Async wrapper over the Logs Query API. Always uses the server's own
@@ -43,7 +45,9 @@ class LAWClient:
             # Class name only: the partial-error MESSAGE routinely echoes the
             # failing query fragment, which must not reach a log or the caller
             # (report L-3 / H-5).
-            partial_error = type(resp.partial_error).__name__ if resp.partial_error else "PartialError"
+            partial_error = (
+                type(resp.partial_error).__name__ if resp.partial_error else "PartialError"
+            )
         else:
             tables = resp.tables
             partial_error = None

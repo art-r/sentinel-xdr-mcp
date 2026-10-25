@@ -5,6 +5,7 @@ Security-relevant config MUST fail closed and fail at startup:
   * explicit validators reject empty blocklists, unknown tool names, bad tiers
 Secrets never live here or in the YAML.
 """
+
 from __future__ import annotations
 
 import os
@@ -19,15 +20,17 @@ DEFAULT_CONFIG_PATH = "/app/config/mcp-server-config.yaml"
 
 #: Every tool the server registers. `allowed_tools` is validated against this,
 #: so a typo in config is a startup error rather than a silently denied tool.
-KNOWN_TOOLS: frozenset[str] = frozenset({
-    "list_available_tables",
-    "get_table_schema",
-    "query_sentinel_logs",
-    "get_incident",
-    "get_incident_entities",
-    "add_incident_comment",
-    "query_defender_hunting",
-})
+KNOWN_TOOLS: frozenset[str] = frozenset(
+    {
+        "list_available_tables",
+        "get_table_schema",
+        "query_sentinel_logs",
+        "get_incident",
+        "get_incident_entities",
+        "add_incident_comment",
+        "query_defender_hunting",
+    }
+)
 
 #: Tools that mutate Sentinel. They get their own (much smaller) rate budget.
 WRITE_TOOLS: frozenset[str] = frozenset({"add_incident_comment"})
@@ -84,7 +87,9 @@ class ServerConfig(_Base):
         for value in values:
             host = value.strip().lower().rstrip(".")
             if not host or "://" in host or "/" in host or ":" in host or "*" in host:
-                raise ValueError("host_header_allowlist entries must be plain, non-wildcard host names")
+                raise ValueError(
+                    "host_header_allowlist entries must be plain, non-wildcard host names"
+                )
             normalized.append(host)
         return normalized
 
@@ -271,8 +276,11 @@ class LoggingConfig(_Base):
     def _known_tiers(cls, v: list[str]) -> list[str]:
         unknown = set(v) - CALLER_TYPES
         if unknown:
-            raise ValueError(f"logging.log_query_text_for: unknown caller type(s) {sorted(unknown)}")
+            raise ValueError(
+                f"logging.log_query_text_for: unknown caller type(s) {sorted(unknown)}"
+            )
         return v
+
 
 class DefenderKqlConfig(_Base):
     """KQL restrictions for the Defender advanced-hunting dialect.
@@ -281,6 +289,7 @@ class DefenderKqlConfig(_Base):
     functions that return data beyond the tables named in the query, which the
     Sentinel profile has never needed to know about.
     """
+
     max_query_length: int = Field(default=4000, gt=0)
     banned_functions: list[str] = Field(min_length=1)
     banned_operators: list[str] = Field(min_length=1)
@@ -294,6 +303,7 @@ class DefenderConfig(_Base):
     scoped to device groups. Do not enable without reading trust-model.md,
     "Regime A extended", and confirming the precondition recorded there.
     """
+
     enabled: bool = False
     graph_base_url: AnyHttpUrl = "https://graph.microsoft.com/v1.0"  # type: ignore[assignment]
     #: Must stay below server.max_request_timeout_seconds - enforced in _check.
@@ -325,6 +335,7 @@ class DefenderConfig(_Base):
     @property
     def max_result_size_bytes(self) -> int:
         return self.max_result_size_mb * 1024 * 1024
+
 
 class Config(_Base):
     server: ServerConfig
@@ -375,25 +386,31 @@ class Config(_Base):
                     )
             unknown_tiers = set(gov.allowed_tables) - set(tiers)
             if unknown_tiers:
-                raise ValueError(f"governance.{name}.allowed_tables: unknown tier(s) {sorted(unknown_tiers)}")
+                raise ValueError(
+                    f"governance.{name}.allowed_tables: unknown tier(s) {sorted(unknown_tiers)}"
+                )
             unknown_tools = set(gov.allowed_tools) - KNOWN_TOOLS
             if unknown_tools:
-                raise ValueError(f"governance.{name}.allowed_tools: unknown tool(s) {sorted(unknown_tools)}")
+                raise ValueError(
+                    f"governance.{name}.allowed_tools: unknown tool(s) {sorted(unknown_tools)}"
+                )
         if WRITE_TOOLS & set(self.governance["human"].allowed_tools):
             raise ValueError("human tier must not be granted write tools")
         if self.defender is not None and self.defender.enabled:
             if self.server.max_request_timeout_seconds <= self.defender.timeout_seconds:
                 raise ValueError(
-                    "server.max_request_timeout_seconds must exceed "
-                    "defender.timeout_seconds"
+                    "server.max_request_timeout_seconds must exceed defender.timeout_seconds"
                 )
             if not self.defender_tables():
                 raise ValueError("defender resolves to zero allowed tables")
         if not self.allowed_tables_for("human"):
             raise ValueError("human tier resolves to zero allowed tables")
         if self.defender is not None and self.defender.enabled:
-            users = [name for name, gov in self.governance.items()
-                     if TENANT_WIDE_TOOLS & set(gov.allowed_tools)]
+            users = [
+                name
+                for name, gov in self.governance.items()
+                if TENANT_WIDE_TOOLS & set(gov.allowed_tools)
+            ]
             if not users:
                 raise ValueError(
                     "defender.enabled is true but no tier lists "
@@ -402,7 +419,9 @@ class Config(_Base):
                     "tool is filtered out of tools/list - a data source the caller "
                     "can see and cannot use. Enabling Defender hunting is TWO edits."
                 )
-        longest_query_timeout = max(tier.max_query_timeout_seconds for tier in self.governance.values())
+        longest_query_timeout = max(
+            tier.max_query_timeout_seconds for tier in self.governance.values()
+        )
         if self.server.max_request_timeout_seconds <= longest_query_timeout:
             raise ValueError(
                 "server.max_request_timeout_seconds must exceed every tier's "

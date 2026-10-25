@@ -12,15 +12,19 @@ from src.governance.result_truncation import truncate
 from src.server import deps, mcp
 
 _MAX_KQL_CHARS = (
-    deps.config.defender.kql.max_query_length
-    if deps.config.defender is not None
-    else 4000
+    deps.config.defender.kql.max_query_length if deps.config.defender is not None else 4000
 )
 
 
 async def query_defender_hunting(
-    kql: Annotated[str, Field(min_length=1, max_length=_MAX_KQL_CHARS,
-                              description="Defender advanced-hunting KQL query")],
+    kql: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=_MAX_KQL_CHARS,
+            description="Defender advanced-hunting KQL query",
+        ),
+    ],
     ctx: Context,
 ) -> dict:
     """Run a Microsoft Defender XDR advanced-hunting query.
@@ -53,45 +57,56 @@ async def query_defender_hunting(
     # separately reviewable. Same defence-in-depth pattern as the caller.type
     # check in add_incident_comment.
     if cfg.required_role not in set(caller.claims.get("roles") or []):
-        deps.audit.log_denied("missing_defender_role", tool="query_defender_hunting",
-                              caller=caller)
+        deps.audit.log_denied("missing_defender_role", tool="query_defender_hunting", caller=caller)
         raise ToolError(
-            "Defender advanced hunting requires an additional role that this "
-            "account does not hold."
+            "Defender advanced hunting requires an additional role that this account does not hold."
         )
 
     args = {"kql": kql}
     result = deps.defender_kql_validator.validate(kql, caller.type)
     if not result.is_valid:
-        deps.audit.log_tool_call(caller, "query_defender_hunting", args,
-                                 source="defender",
-                                 validation_result=f"rejected: {result.error}")
+        deps.audit.log_tool_call(
+            caller,
+            "query_defender_hunting",
+            args,
+            source="defender",
+            validation_result=f"rejected: {result.error}",
+        )
         raise ToolError(f"KQL validation failed: {result.error}")
 
     start = time.monotonic()
     try:
         raw = await deps.defender_client.run_query(result.sanitized_kql)
     except HuntingQuotaExhausted as exc:
-        deps.audit.log_denied("defender_quota_exhausted", tool="query_defender_hunting",
-                              caller=caller)
+        deps.audit.log_denied(
+            "defender_quota_exhausted", tool="query_defender_hunting", caller=caller
+        )
         raise ToolError(str(exc)) from None
     except HuntingUnavailable as exc:
-        deps.audit.log_tool_failure(caller, "query_defender_hunting", args, error=exc,
-                                    duration_ms=int((time.monotonic() - start) * 1000))
+        deps.audit.log_tool_failure(
+            caller,
+            "query_defender_hunting",
+            args,
+            error=exc,
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
         raise ToolError(
             "Advanced hunting failed (the service rejected the query, timed out, "
             "or is unavailable). Simplify the query or narrow the time filter."
         ) from None
 
-    out = truncate(raw, cfg.max_result_rows, cfg.max_result_size_bytes,
-                   cfg.max_cell_chars)
-    deps.audit.log_tool_call(caller, "query_defender_hunting", args,
-                             source="defender",
-                             executed_kql=result.sanitized_kql,
-                             tables=result.extracted_tables,
-                             result_row_count=out["row_count"],
-                             truncated=out["truncated"],
-                             duration_ms=int((time.monotonic() - start) * 1000))
+    out = truncate(raw, cfg.max_result_rows, cfg.max_result_size_bytes, cfg.max_cell_chars)
+    deps.audit.log_tool_call(
+        caller,
+        "query_defender_hunting",
+        args,
+        source="defender",
+        executed_kql=result.sanitized_kql,
+        tables=result.extracted_tables,
+        result_row_count=out["row_count"],
+        truncated=out["truncated"],
+        duration_ms=int((time.monotonic() - start) * 1000),
+    )
     return out
 
 

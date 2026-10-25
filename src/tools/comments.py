@@ -18,9 +18,17 @@ _MAX_COMMENT_CHARS = max(tier.max_comment_chars for tier in deps.config.governan
 
 
 async def add_incident_comment(
-    incident_id: Annotated[str, Field(pattern=r"^\d{1,10}$", description="Sentinel incident number")],
-    comment: Annotated[str, Field(min_length=1, max_length=_MAX_COMMENT_CHARS,
-                                  description="Markdown-formatted comment text")],
+    incident_id: Annotated[
+        str, Field(pattern=r"^\d{1,10}$", description="Sentinel incident number")
+    ],
+    comment: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=_MAX_COMMENT_CHARS,
+            description="Markdown-formatted comment text",
+        ),
+    ],
     ctx: Context,
 ) -> dict:
     """Write a Markdown-formatted comment to a Sentinel incident.
@@ -48,23 +56,36 @@ async def add_incident_comment(
         f"Automated content - verify before acting.\n\n"
     )
     body = sanitize_comment(comment, max(1, gov.max_comment_chars - len(header)))
-    args = {"incident_id": incident_id, "comment": comment, "comment_len": len(body),
-            "correlation_id": correlation_id}
+    args = {
+        "incident_id": incident_id,
+        "comment": comment,
+        "comment_len": len(body),
+        "correlation_id": correlation_id,
+    }
 
     start = time.monotonic()
     try:
         result = await deps.sentinel_client.add_comment(incident_id, header + body)
     except ValueError as exc:
-        deps.audit.log_tool_call(caller, "add_incident_comment", args, validation_result="not_found")
+        deps.audit.log_tool_call(
+            caller, "add_incident_comment", args, validation_result="not_found"
+        )
         raise ToolError(str(exc)) from None
     except Exception as exc:
-        deps.audit.log_tool_failure(caller, "add_incident_comment", args, error=exc,
-                                    duration_ms=int((time.monotonic() - start) * 1000))
-        raise ToolError("Could not write the comment (Sentinel is unavailable or refused "
-                        "the request).") from None
+        deps.audit.log_tool_failure(
+            caller,
+            "add_incident_comment",
+            args,
+            error=exc,
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
+        raise ToolError(
+            "Could not write the comment (Sentinel is unavailable or refused the request)."
+        ) from None
 
-    deps.audit.log_tool_call(caller, "add_incident_comment", args,
-                             duration_ms=int((time.monotonic() - start) * 1000))
+    deps.audit.log_tool_call(
+        caller, "add_incident_comment", args, duration_ms=int((time.monotonic() - start) * 1000)
+    )
     return {**result, "correlation_id": correlation_id}
 
 

@@ -30,11 +30,17 @@ async def get_incident(incident_id: Annotated[str, _ID], ctx: Context) -> dict:
         deps.audit.log_tool_call(caller, "get_incident", args, validation_result="not_found")
         raise ToolError(str(exc)) from None
     except Exception as exc:
-        deps.audit.log_tool_failure(caller, "get_incident", args, error=exc,
-                                    duration_ms=int((time.monotonic() - start) * 1000))
+        deps.audit.log_tool_failure(
+            caller,
+            "get_incident",
+            args,
+            error=exc,
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
         raise ToolError(_GENERIC_ERROR) from None
-    deps.audit.log_tool_call(caller, "get_incident", args,
-                             duration_ms=int((time.monotonic() - start) * 1000))
+    deps.audit.log_tool_call(
+        caller, "get_incident", args, duration_ms=int((time.monotonic() - start) * 1000)
+    )
     return {**scrub_value(incident, gov.max_cell_chars), "content_warning": UNTRUSTED_NOTE}
 
 
@@ -48,16 +54,28 @@ async def get_incident_entities(incident_id: Annotated[str, _ID], ctx: Context) 
     try:
         entities = await deps.sentinel_client.get_incident_entities(incident_id)
     except ValueError as exc:
-        deps.audit.log_tool_call(caller, "get_incident_entities", args, validation_result="not_found")
+        deps.audit.log_tool_call(
+            caller, "get_incident_entities", args, validation_result="not_found"
+        )
         raise ToolError(str(exc)) from None
     except Exception as exc:
-        deps.audit.log_tool_failure(caller, "get_incident_entities", args, error=exc,
-                                    duration_ms=int((time.monotonic() - start) * 1000))
+        deps.audit.log_tool_failure(
+            caller,
+            "get_incident_entities",
+            args,
+            error=exc,
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
         raise ToolError(_GENERIC_ERROR) from None
     out = truncate_list(entities, gov.max_entities, gov.max_result_size_bytes, gov.max_cell_chars)
-    deps.audit.log_tool_call(caller, "get_incident_entities", args,
-                             result_row_count=out["count"], truncated=out["truncated"],
-                             duration_ms=int((time.monotonic() - start) * 1000))
+    deps.audit.log_tool_call(
+        caller,
+        "get_incident_entities",
+        args,
+        result_row_count=out["count"],
+        truncated=out["truncated"],
+        duration_ms=int((time.monotonic() - start) * 1000),
+    )
     return out
 
 

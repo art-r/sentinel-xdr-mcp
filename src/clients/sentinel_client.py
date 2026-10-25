@@ -50,12 +50,16 @@ class SentinelClient:
         # across SDK generations. Failing here means a bad SDK pin surfaces on
         # the first Sentinel call, not silently at 3am on the one write path.
         self._create_comment = _resolve(
-            self._client.incident_comments, COMMENT_CREATE_METHODS, "incident_comments")
+            self._client.incident_comments, COMMENT_CREATE_METHODS, "incident_comments"
+        )
 
     async def _guid_for_number(self, number: str) -> str:
         def _list():
-            return list(self._client.incidents.list(
-                self._rg, self._ws, filter=f"properties/incidentNumber eq {int(number)}"))
+            return list(
+                self._client.incidents.list(
+                    self._rg, self._ws, filter=f"properties/incidentNumber eq {int(number)}"
+                )
+            )
 
         items = await asyncio.to_thread(_list)
         if not items:
@@ -69,10 +73,17 @@ class SentinelClient:
 
     async def get_incident_entities(self, number: str) -> list[dict]:
         guid = await self._guid_for_number(number)
-        resp = await asyncio.to_thread(self._client.incidents.list_entities, self._rg, self._ws, guid)
+        resp = await asyncio.to_thread(
+            self._client.incidents.list_entities, self._rg, self._ws, guid
+        )
         entities = getattr(resp, "entities", None) or []
-        return [{"entity_type": getattr(e, "kind", None),
-                 "properties": e.as_dict() if hasattr(e, "as_dict") else {}} for e in entities]
+        return [
+            {
+                "entity_type": getattr(e, "kind", None),
+                "properties": e.as_dict() if hasattr(e, "as_dict") else {},
+            }
+            for e in entities
+        ]
 
     async def add_comment(self, number: str, message: str) -> dict:
         from azure.mgmt.securityinsight.models import IncidentComment
@@ -82,7 +93,8 @@ class SentinelClient:
 
         def _create():
             return self._create_comment(
-                self._rg, self._ws, guid, comment_id, IncidentComment(message=message))
+                self._rg, self._ws, guid, comment_id, IncidentComment(message=message)
+            )
 
         res = await asyncio.to_thread(_create)
         return {"success": True, "comment_id": getattr(res, "name", comment_id)}

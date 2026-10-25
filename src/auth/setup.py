@@ -41,6 +41,7 @@ fastmcp.server.auth.providers.azure and would derive these values from
 tenant_id/client_id) so that issuer and audience are pinned to exactly what this
 tenant issues. Swap it in if you prefer the derived configuration.
 """
+
 from __future__ import annotations
 
 import json
@@ -138,6 +139,7 @@ def create_auth_provider(config, audit=None) -> RemoteAuthProvider:
         scopes_supported=[config.identity.delegated_scope_uri],
         resource_name="Sentinel MCP Server",
     )
+
 
 #: RFC 9728 inserts the resource's path after the well-known segment, so the
 #: generated document is served at /.well-known/oauth-protected-resource/mcp,

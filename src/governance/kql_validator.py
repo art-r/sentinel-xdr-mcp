@@ -31,6 +31,7 @@ The Managed Identity's RBAC scope (Log Analytics Reader on ONE workspace) is
 still the authoritative boundary. This layer is a usability guard rail and a
 second line of defence, not the security perimeter.
 """
+
 from __future__ import annotations
 
 import re
@@ -248,7 +249,9 @@ class KQLValidator:
 
         cleaned = clean_query(kql)
         if cleaned.lstrip().startswith("."):
-            return ValidationResult(False, "Control commands (queries starting with '.') are not allowed")
+            return ValidationResult(
+                False, "Control commands (queries starting with '.') are not allowed"
+            )
 
         toks = tokenize(cleaned)
         if not toks:
@@ -308,9 +311,11 @@ class KQLValidator:
         while j < n:
             name, after = _read_source(toks, j)
             if name is None:
-                return ("Could not determine the tables used in 'union'. "
-                        "List each source table explicitly; wildcards, nested unions "
-                        "and computed sources are not allowed.")
+                return (
+                    "Could not determine the tables used in 'union'. "
+                    "List each source table explicitly; wildcards, nested unions "
+                    "and computed sources are not allowed."
+                )
             tables.add(name)
 
             k = after
@@ -373,7 +378,7 @@ class KQLValidator:
             head = toks[head_idx]
             next_text = toks[head_idx + 1].text if head_idx + 1 < close_idx else None
             word = head.text.lower()
-            contains_pipe = any(t.text == "|" for t in toks[open_idx + 1:close_idx])
+            contains_pipe = any(t.text == "|" for t in toks[open_idx + 1 : close_idx])
 
             # dynamic([...]) is a scalar list, not a tabular source. Every other
             # function-form head is rejected: it might resolve to a stored

@@ -6,6 +6,7 @@ security-critical wiring - middleware and caller propagation - was unverified
 faked at `src.auth.current.get_access_token`, which is the only place the code
 reads it.
 """
+
 import asyncio
 
 import pytest
@@ -40,9 +41,17 @@ class _Tool:
         self.name = name
 
 
-ALL_TOOLS = [_Tool(n) for n in (
-    "query_sentinel_logs", "get_incident", "get_incident_entities",
-    "list_available_tables", "get_table_schema", "add_incident_comment")]
+ALL_TOOLS = [
+    _Tool(n)
+    for n in (
+        "query_sentinel_logs",
+        "get_incident",
+        "get_incident_entities",
+        "list_available_tables",
+        "get_table_schema",
+        "add_incident_comment",
+    )
+]
 
 
 class _Deps:
@@ -62,8 +71,9 @@ def mw(monkeypatch):
     middleware._test_deps = deps
 
     def _set(claims):
-        monkeypatch.setattr(current_mod, "get_access_token",
-                            lambda: None if claims is None else _Token(claims))
+        monkeypatch.setattr(
+            current_mod, "get_access_token", lambda: None if claims is None else _Token(claims)
+        )
 
     middleware._set_token = _set
     _set(None)
@@ -79,6 +89,7 @@ async def _list_all(context):
 
 
 # ---- tools/list --------------------------------------------------------
+
 
 def test_list_tools_is_scoped_to_the_human_tier(mw):
     mw._set_token(human_claims())
@@ -100,6 +111,7 @@ def test_list_tools_denies_when_unauthenticated(mw):
 
 
 # ---- tools/call --------------------------------------------------------
+
 
 def test_authorized_call_passes_through(mw):
     mw._set_token(human_claims())
@@ -210,8 +222,9 @@ def test_concurrency_limit_is_enforced_and_audited(mw):
         return "OK"
 
     async def main():
-        running = [asyncio.create_task(mw.on_call_tool(_Ctx("get_incident"), slow))
-                   for _ in range(limit)]
+        running = [
+            asyncio.create_task(mw.on_call_tool(_Ctx("get_incident"), slow)) for _ in range(limit)
+        ]
         await asyncio.sleep(0)
         with pytest.raises(ToolError):
             await mw.on_call_tool(_Ctx("get_incident"), _passthrough)
@@ -224,6 +237,7 @@ def test_concurrency_limit_is_enforced_and_audited(mw):
 
 
 # ---- deny by default ---------------------------------------------------
+
 
 def test_on_request_denies_unauthenticated_non_handshake_methods(mw):
     with pytest.raises(ToolError):
@@ -252,9 +266,11 @@ def test_resources_and_prompts_are_denied_unconditionally(mw):
 
 # ---- caller resolution -------------------------------------------------
 
+
 def test_a_raising_token_lookup_fails_closed(mw, monkeypatch):
     """Some FastMCP builds raise instead of returning None when there is no
     auth context. That must be a denial, not a 500."""
+
     def _boom():
         raise RuntimeError("no auth context")
 
@@ -270,7 +286,10 @@ def test_claims_without_a_role_are_denied(mw):
 
 def test_delegated_token_with_the_agent_role_gets_the_human_tier(mw):
     """A user mis-assigned MCP.Agent must not reach the write tool."""
-    mw._set_token(human_claims(roles=[config().identity.required_human_role,
-                                      config().identity.required_agent_role]))
+    mw._set_token(
+        human_claims(
+            roles=[config().identity.required_human_role, config().identity.required_agent_role]
+        )
+    )
     with pytest.raises(ToolError):
         asyncio.run(mw.on_call_tool(_Ctx("add_incident_comment"), _passthrough))

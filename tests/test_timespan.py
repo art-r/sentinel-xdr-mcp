@@ -23,15 +23,39 @@ def _accepted(value: str) -> bool:
         return False
 
 
-ACCEPT = ["P1D", "P7D", "P365D", "PT6H", "PT30M", "PT0S", "P0D",
-          "P7DT12H", "P7DT12H30M", "P7DT12H30M45S", "PT1H1M1S"]
+ACCEPT = [
+    "P1D",
+    "P7D",
+    "P365D",
+    "PT6H",
+    "PT30M",
+    "PT0S",
+    "P0D",
+    "P7DT12H",
+    "P7DT12H30M",
+    "P7DT12H30M45S",
+    "PT1H1M1S",
+]
 
-REJECT = ["", "P", "PT", "1D", "banana", "p1d", "D1P", "P1H", "PTS",
-          # dangling time designator - the look-ahead version accepted these
-          "P1DT", "P0DT",
-          # surrounding whitespace / newline: Python `re` "$" would allow the
-          # trailing newline, the Rust engine does not. We want the Rust answer.
-          " P1D", "P1D ", "P1D\n"]
+REJECT = [
+    "",
+    "P",
+    "PT",
+    "1D",
+    "banana",
+    "p1d",
+    "D1P",
+    "P1H",
+    "PTS",
+    # dangling time designator - the look-ahead version accepted these
+    "P1DT",
+    "P0DT",
+    # surrounding whitespace / newline: Python `re` "$" would allow the
+    # trailing newline, the Rust engine does not. We want the Rust answer.
+    " P1D",
+    "P1D ",
+    "P1D\n",
+]
 
 
 def test_pattern_builds_under_pydantic():

@@ -14,8 +14,10 @@ from src.config import TENANT_WIDE_TOOLS
 
 async def list_available_tables(
     ctx: Context,
-    source: Annotated[Literal["all", "sentinel", "defender"], Field(
-        description="Which data store to list. 'all' (default) returns both.")] = "all",
+    source: Annotated[
+        Literal["all", "sentinel", "defender"],
+        Field(description="Which data store to list. 'all' (default) returns both."),
+    ] = "all",
 ) -> dict:
     """List the tables you may query, per data store. Call this before writing KQL.
 
@@ -40,22 +42,19 @@ async def list_available_tables(
     if source in ("all", "sentinel"):
         tables = sorted(cfg.allowed_tables_for(caller.type))
         if cfg.table_policy_for(caller.type) == "workspace":
-            discovered = [t for t in await deps.workspace_tables()
-                          if not cfg.is_table_blocked(t)]
+            discovered = [t for t in await deps.workspace_tables() if not cfg.is_table_blocked(t)]
             if discovered:
                 tables = sorted(discovered)
         out["sentinel"] = tables
 
     if source in ("all", "defender"):
         enabled = cfg.defender is not None and cfg.defender.enabled
-        has_role = enabled and cfg.defender.required_role in set(
-            caller.claims.get("roles") or [])
+        has_role = enabled and cfg.defender.required_role in set(caller.claims.get("roles") or [])
         # A store with no query tool for THIS caller must not be advertised.
         # on_list_tools filters query_defender_hunting out of tools/list when it
         # is absent from the tier's allowed_tools, so advertising the store here
         # tells the model about data it has no mechanism to fetch.
-        has_tool = bool(
-            TENANT_WIDE_TOOLS & set(cfg.governance[caller.type].allowed_tools))
+        has_tool = bool(TENANT_WIDE_TOOLS & set(cfg.governance[caller.type].allowed_tools))
 
         if enabled and has_role and has_tool:
             # No `Usage` equivalent in advanced hunting: the configured list is
@@ -65,17 +64,18 @@ async def list_available_tables(
             # Explicitly asked for a store that is unavailable - name the
             # reason. Under "all" it is silently omitted.
             if not enabled:
-                raise ToolError(
-                    "Defender advanced hunting is not enabled on this server.")
+                raise ToolError("Defender advanced hunting is not enabled on this server.")
             if not has_role:
-                deps.audit.log_denied("missing_defender_role",
-                                      tool="list_available_tables", caller=caller)
+                deps.audit.log_denied(
+                    "missing_defender_role", tool="list_available_tables", caller=caller
+                )
                 raise ToolError(
                     "Defender advanced hunting requires an additional role that "
                     "this account does not hold."
                 )
-            deps.audit.log_denied("defender_tool_not_in_tier",
-                                  tool="list_available_tables", caller=caller)
+            deps.audit.log_denied(
+                "defender_tool_not_in_tier", tool="list_available_tables", caller=caller
+            )
             raise ToolError(
                 "Defender advanced hunting is enabled but no query tool is "
                 "available to this caller. This is a server configuration error - "
@@ -83,7 +83,9 @@ async def list_available_tables(
             )
 
     deps.audit.log_tool_call(
-        caller, "list_available_tables", {"source": source},
+        caller,
+        "list_available_tables",
+        {"source": source},
         source=source,
         result_row_count=sum(len(v) for v in out.values()),
         duration_ms=int((time.monotonic() - start) * 1000),
@@ -92,12 +94,21 @@ async def list_available_tables(
 
 
 async def get_table_schema(
-    table_name: Annotated[str, Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{1,63}$",
-                                     description="Exact table name, e.g. 'SigninLogs'")],
+    table_name: Annotated[
+        str,
+        Field(
+            pattern=r"^[A-Za-z][A-Za-z0-9_]{1,63}$",
+            description="Exact table name, e.g. 'SigninLogs'",
+        ),
+    ],
     ctx: Context,
-    source: Annotated[Literal["sentinel", "defender"], Field(
-        description="Which store the table belongs to. Use the key it appeared "
-                    "under in list_available_tables.")] = "sentinel",
+    source: Annotated[
+        Literal["sentinel", "defender"],
+        Field(
+            description="Which store the table belongs to. Use the key it appeared "
+            "under in list_available_tables."
+        ),
+    ] = "sentinel",
 ) -> dict:
     """Return column names and types for one table in one data store.
 
@@ -119,8 +130,7 @@ async def get_table_schema(
         if cfg.defender is None or not cfg.defender.enabled:
             raise ToolError("Defender advanced hunting is not enabled on this server.")
         if cfg.defender.required_role not in set(caller.claims.get("roles") or []):
-            deps.audit.log_denied("missing_defender_role", tool="get_table_schema",
-                                  caller=caller)
+            deps.audit.log_denied("missing_defender_role", tool="get_table_schema", caller=caller)
             raise ToolError(
                 "Defender advanced hunting requires an additional role that this "
                 "account does not hold."
@@ -135,10 +145,17 @@ async def get_table_schema(
             # validator profile and costs one hunting call.
             raw = await deps.defender_client.run_query(f"{table_name} | getschema")
         except Exception as exc:
-            deps.audit.log_tool_failure(caller, "get_table_schema", args, error=exc,
-                                        duration_ms=int((time.monotonic() - start) * 1000))
-            raise ToolError("Could not read the table schema from advanced hunting "
-                            "(the service is unavailable or refused the query).") from None
+            deps.audit.log_tool_failure(
+                caller,
+                "get_table_schema",
+                args,
+                error=exc,
+                duration_ms=int((time.monotonic() - start) * 1000),
+            )
+            raise ToolError(
+                "Could not read the table schema from advanced hunting "
+                "(the service is unavailable or refused the query)."
+            ) from None
         schema = [dict(zip(raw["columns"], row, strict=False)) for row in raw["rows"]]
         max_columns = gov.max_schema_columns
         max_bytes = cfg.defender.max_result_size_bytes
@@ -151,18 +168,31 @@ async def get_table_schema(
         try:
             schema = await deps.law_client.get_table_schema(table_name)
         except Exception as exc:
-            deps.audit.log_tool_failure(caller, "get_table_schema", args, error=exc,
-                                        duration_ms=int((time.monotonic() - start) * 1000))
-            raise ToolError("Could not read the table schema (the workspace is "
-                            "unavailable or the table has no data).") from None
+            deps.audit.log_tool_failure(
+                caller,
+                "get_table_schema",
+                args,
+                error=exc,
+                duration_ms=int((time.monotonic() - start) * 1000),
+            )
+            raise ToolError(
+                "Could not read the table schema (the workspace is "
+                "unavailable or the table has no data)."
+            ) from None
         max_columns = gov.max_schema_columns
         max_bytes = gov.max_result_size_bytes
         max_cell = gov.max_cell_chars
 
     out = truncate_list(schema, max_columns, max_bytes, max_cell)
-    deps.audit.log_tool_call(caller, "get_table_schema", args, source=source,
-                             result_row_count=out["count"], truncated=out["truncated"],
-                             duration_ms=int((time.monotonic() - start) * 1000))
+    deps.audit.log_tool_call(
+        caller,
+        "get_table_schema",
+        args,
+        source=source,
+        result_row_count=out["count"],
+        truncated=out["truncated"],
+        duration_ms=int((time.monotonic() - start) * 1000),
+    )
     return out
 
 

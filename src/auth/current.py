@@ -16,6 +16,7 @@ Why not stash the CallerContext in `Context` state:
 
 Re-deriving has neither problem and cannot drift from the middleware's view.
 """
+
 from __future__ import annotations
 
 from fastmcp.server.dependencies import get_access_token

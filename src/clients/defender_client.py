@@ -9,6 +9,7 @@ See trust-model.md, "Regime A extended".
 Deliberately separate from LAWClient: different endpoint, different token
 audience, different KQL dialect, different quota model. Do not merge them.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -48,8 +49,7 @@ def _to_table(payload: dict) -> dict:
 class DefenderHuntingClient:
     def __init__(self, config) -> None:
         self._cfg = config.defender
-        self._credential = ManagedIdentityCredential(
-            client_id=config.identity.mcp_mi_client_id)
+        self._credential = ManagedIdentityCredential(client_id=config.identity.mcp_mi_client_id)
         self._client = httpx2.AsyncClient(
             base_url=str(self._cfg.graph_base_url).rstrip("/"),
             timeout=httpx2.Timeout(self._cfg.timeout_seconds),
@@ -68,7 +68,8 @@ class DefenderHuntingClient:
                 slot, used = minute, 0
             if used >= self._cfg.calls_per_minute:
                 raise HuntingQuotaExhausted(
-                    "Advanced-hunting rate limit reached. Retry in under a minute.")
+                    "Advanced-hunting rate limit reached. Retry in under a minute."
+                )
 
             today = time.strftime("%Y-%m-%d", time.gmtime())
             day, spent = self._day
@@ -76,7 +77,8 @@ class DefenderHuntingClient:
                 day, spent = today, 0
             if spent >= self._cfg.daily_call_budget:
                 raise HuntingQuotaExhausted(
-                    "Daily advanced-hunting budget exhausted. Retry tomorrow.")
+                    "Daily advanced-hunting budget exhausted. Retry tomorrow."
+                )
 
             self._minute = (slot, used + 1)
             self._day = (day, spent + 1)
@@ -88,13 +90,16 @@ class DefenderHuntingClient:
             response = await self._client.post(
                 "/security/runHuntingQuery",
                 json={"Query": kql},
-                headers={"Authorization": f"Bearer {token.token}",
-                         "Content-Type": "application/json"},
+                headers={
+                    "Authorization": f"Bearer {token.token}",
+                    "Content-Type": "application/json",
+                },
             )
             if response.status_code == 429:
                 # Tenant-wide throttle: another consumer is spending the budget.
                 raise HuntingQuotaExhausted(
-                    "Advanced hunting is throttled tenant-wide. Retry shortly.")
+                    "Advanced hunting is throttled tenant-wide. Retry shortly."
+                )
             response.raise_for_status()
             payload = response.json()
         except HuntingQuotaExhausted:

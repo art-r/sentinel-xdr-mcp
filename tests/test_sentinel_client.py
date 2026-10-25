@@ -5,6 +5,7 @@ names have moved across SDK generations - `incident_comments.create` did not
 exist in 1.x, and the only code path that used it was the single write path,
 so a wrong guess would have surfaced in production and nowhere else.
 """
+
 import pytest
 
 from src.clients.sentinel_client import COMMENT_CREATE_METHODS, _resolve, _incident_to_dict

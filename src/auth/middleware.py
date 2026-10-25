@@ -16,6 +16,7 @@ Rejections are raised as ToolError: FastMCP masks other exception types into a
 generic internal error, so a plain PermissionError tells the caller nothing and
 cannot trigger re-authentication.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -75,7 +76,8 @@ class AuthorizationMiddleware(Middleware):
 
         try:
             self.deps.rate_limiter.check_or_raise(
-                f"{caller.id}:{tool_name}", gov.rate_limit_for(tool_name))
+                f"{caller.id}:{tool_name}", gov.rate_limit_for(tool_name)
+            )
         except RateLimitExceeded as exc:
             self.audit.log_denied("rate_limited", tool=tool_name, caller=caller)
             raise ToolError(str(exc)) from None
@@ -87,16 +89,24 @@ class AuthorizationMiddleware(Middleware):
                         "__server__", self.config.server.max_concurrent_requests
                     ):
                         try:
-                            async with asyncio.timeout(self.config.server.max_request_timeout_seconds):
+                            async with asyncio.timeout(
+                                self.config.server.max_request_timeout_seconds
+                            ):
                                 return await call_next(context)
                         except TimeoutError:
-                            self.audit.log_denied("request_timed_out", tool=tool_name, caller=caller)
+                            self.audit.log_denied(
+                                "request_timed_out", tool=tool_name, caller=caller
+                            )
                             raise ToolError(
                                 "Request timed out. Narrow the query or retry with fewer concurrent requests."
                             ) from None
                 except ConcurrencyLimitExceeded:
-                    self.audit.log_denied("global_concurrency_limited", tool=tool_name, caller=caller)
-                    raise ToolError("Server is at its concurrent-request limit. Retry shortly.") from None
+                    self.audit.log_denied(
+                        "global_concurrency_limited", tool=tool_name, caller=caller
+                    )
+                    raise ToolError(
+                        "Server is at its concurrent-request limit. Retry shortly."
+                    ) from None
         except ConcurrencyLimitExceeded as exc:
             self.audit.log_denied("concurrency_limited", tool=tool_name, caller=caller)
             raise ToolError(str(exc)) from None

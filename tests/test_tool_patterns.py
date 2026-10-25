@@ -9,6 +9,7 @@ fires on import: the server does not start and pytest cannot even collect.
 This scans the source rather than testing one known pattern, so the next one
 someone adds is covered too.
 """
+
 import ast
 import importlib
 import pathlib
