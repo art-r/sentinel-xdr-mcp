@@ -186,7 +186,7 @@ jobs:
             || { echo "::error::image runs as '$user', expected 'mcp'"; exit 1; }
 
       - name: Trivy
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: sentinel-mcp:ci
           format: table
