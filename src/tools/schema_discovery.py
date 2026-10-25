@@ -139,7 +139,7 @@ async def get_table_schema(
                                         duration_ms=int((time.monotonic() - start) * 1000))
             raise ToolError("Could not read the table schema from advanced hunting "
                             "(the service is unavailable or refused the query).") from None
-        schema = [dict(zip(raw["columns"], row)) for row in raw["rows"]]
+        schema = [dict(zip(raw["columns"], row, strict=False)) for row in raw["rows"]]
         max_columns = gov.max_schema_columns
         max_bytes = cfg.defender.max_result_size_bytes
         max_cell = cfg.defender.max_cell_chars

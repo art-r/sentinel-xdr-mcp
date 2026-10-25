@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import inspect
 import time
-import traceback
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
@@ -17,6 +16,7 @@ from src.auth.middleware import AuthorizationMiddleware
 from src.auth.setup import apply_oauth_resource_override, create_auth_provider
 from src.clients.law_client import LAWClient
 from src.clients.sentinel_client import SentinelClient
+from src.clients.defender_client import DefenderHuntingClient
 from src.config import load_config
 from src.governance.kql_validator import KQLValidator
 from src.governance.rate_limiter import ConcurrencyLimiter, SlidingWindowRateLimiter
@@ -42,7 +42,7 @@ class Deps:
             if config.defender is not None and config.defender.enabled
             else None
         )
-        self._defender_client: "DefenderHuntingClient | None" = None
+        self._defender_client: DefenderHuntingClient | None = None
         self.rate_limiter = SlidingWindowRateLimiter()
         self.concurrency = ConcurrencyLimiter()
         # Separate from per-caller limits: prevents aggregate exhaustion of the

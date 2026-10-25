@@ -6,20 +6,20 @@ error (a bad decorator, a missing import, a tool that cannot resolve its caller)
 fails here rather than in production.
 """
 import asyncio
+import copy
 
 import pytest
 from fastmcp.exceptions import ToolError
 
 from src import server as srv
-from src.auth import current as current_mod
-from src.logging_setup import AuditLogger
 from src.tools.comments import add_incident_comment
 from src.tools.incidents import get_incident, get_incident_entities
 from src.tools.query_logs import query_sentinel_logs
 from src.tools.schema_discovery import get_table_schema, list_available_tables
 
 from ._support import (
-    FakeLAW, FakeSentinel, agent_claims, config, human_claims, defender_human_claims
+    FakeLAW, FakeSentinel, agent_claims, config, human_claims,
+    defender_human_claims, defender_config
 )
 
 # ---- caller resolution (the C-1 regression) ----------------------------
@@ -253,7 +253,7 @@ def test_zero_rows_from_a_schema_only_table_is_explained(env):
     assert out["row_count"] == 0
     assert "schema-only" in out["note"] or "advanced hunting" in out["note"]
 
-def test_zero_rows_from_a_schema_only_table_is_explained(env):
+def test_zero_rows_from_a_schema_only_table_is_explained_query_defender(env):
     """A schema-only table returns zero rows with no error. Without the note
     the model reports 'no findings' on a security question."""
     if config().table_policy_for("human") != "workspace":
@@ -322,12 +322,6 @@ def test_defender_store_is_not_advertised_without_the_query_tool(defender_env,
                                                                  monkeypatch):
     """Advertising a store the caller cannot query is what produced the
     'discoverable but not queryable' report."""
-    import copy
-
-    from src.config import Config
-    from src.governance.kql_validator import KQLValidator
-    from src import server as srv
-    from ._support import defender_config
 
     data = copy.deepcopy(defender_config().model_dump(mode="json"))
     tools = data["governance"]["human"]["allowed_tools"]

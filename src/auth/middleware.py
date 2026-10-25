@@ -94,7 +94,7 @@ class AuthorizationMiddleware(Middleware):
                             raise ToolError(
                                 "Request timed out. Narrow the query or retry with fewer concurrent requests."
                             ) from None
-                except ConcurrencyLimitExceeded as exc:
+                except ConcurrencyLimitExceeded:
                     self.audit.log_denied("global_concurrency_limited", tool=tool_name, caller=caller)
                     raise ToolError("Server is at its concurrent-request limit. Retry shortly.") from None
         except ConcurrencyLimitExceeded as exc:

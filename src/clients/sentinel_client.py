@@ -104,7 +104,7 @@ def _incident_to_dict(inc) -> dict:
         "status": getattr(inc, "status", None),
         "description": getattr(inc, "description", None),
         "owner": owner.as_dict() if hasattr(owner, "as_dict") else None,
-        "labels": [l.as_dict() if hasattr(l, "as_dict") else l for l in labels],
+        "labels": [label.as_dict() if hasattr(label, "as_dict") else label for label in labels],
         "created_time_utc": str(getattr(inc, "created_time_utc", None)),
         "last_modified_time_utc": str(getattr(inc, "last_modified_time_utc", None)),
         "alerts_count": getattr(ad, "alerts_count", None) if ad else None,

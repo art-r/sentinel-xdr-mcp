@@ -77,7 +77,6 @@ def test_only_the_example_config_is_tracked_by_git():
     """Per-tenant configs name the tenant, subscription, workspace and app
     registrations. `.gitignore` allowlists exactly one file; this asserts the
     allowlist is doing its job in THIS checkout, which CI also checks."""
-    import subprocess
 
     try:
         tracked = subprocess.run(
@@ -268,18 +267,6 @@ def test_all_http_client_loggers_are_pinned():
     from src.logging_setup import _NOISY_LOGGERS
     for name in ("httpx", "httpcore", "httpx2", "httpcore2", "urllib3"):
         assert name in _NOISY_LOGGERS, f"{name} would log request URLs at DEBUG"
-
-def test_hunting_tool_requires_defender_enabled():
-    _expect_invalid(lambda d: (
-        d["governance"]["human"]["allowed_tools"].append("query_defender_hunting"),
-        d.setdefault("defender", {}).update(enabled=False),
-    ))
-
-
-def test_hunting_tool_cannot_coexist_with_a_write_tool():
-    def mutate(d):
-        d["governance"]["agent"]["allowed_tools"].append("query_defender_hunting")
-    _expect_invalid(mutate)
 
 # ---- Defender hunting ---------------------------------------------------
 #

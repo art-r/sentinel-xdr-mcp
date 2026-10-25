@@ -62,7 +62,7 @@ class LAWClient:
     async def get_table_schema(self, table_name: str) -> list[dict]:
         result = await self.query(f"{table_name} | getschema", timedelta(minutes=5), 60)
         cols = result["columns"]
-        return [dict(zip(cols, row)) for row in result["rows"]]
+        return [dict(zip(cols, row, strict=False)) for row in result["rows"]]
 
     async def check_workspace_access(self) -> None:
         """Readiness probe: prove the MI can query the configured workspace.
